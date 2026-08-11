@@ -10,6 +10,7 @@ import {
 import { ICONS } from "../../icons.ts";
 import { avatarFallbackUrl } from "../../../shared/avatar.ts";
 import { escapeHtml, loadingMarkup, setButtonBusy } from "../dom.ts";
+import { hydrateErpImages } from "../image-preview.ts";
 import {
   mountRichCommentEditor,
   richEditorHasContent,
@@ -202,6 +203,8 @@ export async function renderPinThreadPanel(
         if (id) setReplyTarget(id);
       });
     });
+
+    void hydrateErpImages(listEl);
   };
 
   const reloadThread = async () => {

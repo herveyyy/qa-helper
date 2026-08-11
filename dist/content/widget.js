@@ -566,6 +566,18 @@
     }
     return { ok: false, error: "Reload this page — Faye was updated." };
   }
+  async function fetchErpFileDataUrl(url) {
+    const response = await sendRuntimeMessage({
+      type: "FETCH_ERP_FILE_DATA",
+      url
+    });
+    if (response?.type === "ERP_FILE_DATA") {
+      if (response.ok)
+        return { ok: true, dataUrl: response.dataUrl };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Faye was updated." };
+  }
 
   // src/content/env-specs.ts
   function collectEnvSpecs() {
@@ -658,13 +670,26 @@
       const value = (src?.[2] || src?.[3] || src?.[4] || "").trim();
       if (/^(https?:|\/)/i.test(value) || /^data:image\//i.test(value)) {
         kept.push(`src="${value.replaceAll('"', "")}"`);
-        kept.push('style="max-width:100%;height:auto"');
       } else {
         return "";
       }
       const alt = attrs.match(/\balt\s*=\s*("([^"]*)"|'([^']*)')/i);
       if (alt)
         kept.push(`alt="${(alt[2] || alt[3] || "").replaceAll('"', "")}"`);
+      const width = attrs.match(/\bwidth\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const widthVal = (width?.[2] || width?.[3] || width?.[4] || "").trim();
+      if (/^\d{1,4}(px)?$/i.test(widthVal)) {
+        kept.push(`width="${widthVal.replace(/px$/i, "")}"`);
+      }
+      const style = attrs.match(/\bstyle\s*=\s*("([^"]*)"|'([^']*)')/i);
+      const styleRaw = style?.[2] || style?.[3] || "";
+      const widthMatch = styleRaw.match(/(?:^|;)\s*width\s*:\s*(\d{1,4})px/i);
+      const parts = ["max-width:100%", "height:auto"];
+      if (widthMatch?.[1])
+        parts.unshift(`width:${widthMatch[1]}px`);
+      else if (widthVal)
+        parts.unshift(`width:${widthVal.replace(/px$/i, "")}px`);
+      kept.push(`style="${parts.join(";")}"`);
     }
     return kept.length ? `<${tag} ${kept.join(" ")}>` : `<${tag}>`;
   }
@@ -689,9 +714,71 @@
     return out.trim();
   }
 
+  // src/content/widget/image-preview.ts
+  var previewCache = new Map;
+  function needsErpProxy(src) {
+    if (!src || src.startsWith("data:") || src.startsWith("blob:"))
+      return false;
+    try {
+      const url = new URL(src, "https://erp.livro.systems");
+      if (url.hostname.includes("livro.systems"))
+        return true;
+      return src.includes("/private/files/") || src.startsWith("/files/");
+    } catch {
+      return src.includes("/private/files/");
+    }
+  }
+  async function hydrateErpImages(root) {
+    const images = Array.from(root.querySelectorAll("img"));
+    await Promise.all(images.map(async (img) => {
+      const src = img.getAttribute("src") || "";
+      const erpSrc = img.getAttribute("data-erp-src") || src;
+      if (!needsErpProxy(erpSrc))
+        return;
+      img.setAttribute("data-erp-src", erpSrc);
+      const cached = previewCache.get(erpSrc);
+      if (cached) {
+        img.src = cached;
+        return;
+      }
+      img.classList.add("giya-img-loading");
+      const result = await fetchErpFileDataUrl(erpSrc);
+      img.classList.remove("giya-img-loading");
+      if (!result.ok) {
+        img.classList.add("giya-img-broken");
+        return;
+      }
+      previewCache.set(erpSrc, result.dataUrl);
+      img.src = result.dataUrl;
+      img.classList.remove("giya-img-broken");
+    }));
+  }
+
   // src/content/widget/rich-editor.ts
   function toolbarButton(cmd, label, title) {
     return `<button type="button" data-cmd="${cmd}" class="giya-rte-btn" title="${title}" aria-label="${title}">${label}</button>`;
+  }
+  function exportEditorHtml(editor) {
+    const clone = editor.cloneNode(true);
+    clone.querySelectorAll(".giya-img-resize").forEach((node) => node.remove());
+    clone.querySelectorAll("img").forEach((img) => {
+      const erp = img.getAttribute("data-erp-src");
+      if (erp)
+        img.setAttribute("src", erp);
+      img.removeAttribute("data-erp-src");
+      img.classList.remove("giya-img-selected", "giya-img-loading", "giya-img-broken");
+      const width = img.style.width || img.getAttribute("width");
+      if (width) {
+        const px = String(width).replace(/px$/i, "");
+        if (/^\d+$/.test(px)) {
+          img.setAttribute("width", px);
+          img.style.width = `${px}px`;
+          img.style.maxWidth = "100%";
+          img.style.height = "auto";
+        }
+      }
+    });
+    return sanitizeCommentHtml(clone.innerHTML);
   }
   function mountRichCommentEditor(host, opts = {}) {
     host.innerHTML = `
@@ -723,6 +810,7 @@
     const editor = host.querySelector("[data-rte-editor]");
     const fileInput = host.querySelector("[data-rte-file]");
     const toolbar = host.querySelector(".giya-rte-toolbar");
+    let selectedImg = null;
     const run = (command, value) => {
       editor.focus();
       try {
@@ -751,6 +839,68 @@
         btn.classList.toggle("is-active", on);
         btn.setAttribute("aria-pressed", on ? "true" : "false");
       }
+    };
+    const clearImageSelection = () => {
+      editor.querySelectorAll(".giya-img-selected").forEach((el) => {
+        el.classList.remove("giya-img-selected");
+      });
+      editor.querySelectorAll(".giya-img-resize").forEach((el) => el.remove());
+      selectedImg = null;
+    };
+    const selectImage = (img) => {
+      clearImageSelection();
+      selectedImg = img;
+      img.classList.add("giya-img-selected");
+      const handle = document.createElement("span");
+      handle.className = "giya-img-resize";
+      handle.contentEditable = "false";
+      handle.title = "Drag to resize";
+      img.insertAdjacentElement("afterend", handle);
+      const onMove = (event) => {
+        if (!selectedImg)
+          return;
+        const rect = selectedImg.getBoundingClientRect();
+        const next = Math.max(80, Math.min(editor.clientWidth - 8, event.clientX - rect.left));
+        selectedImg.style.width = `${Math.round(next)}px`;
+        selectedImg.style.height = "auto";
+        selectedImg.setAttribute("width", String(Math.round(next)));
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      handle.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+      });
+    };
+    const insertImageFromFile = async (file, statusText) => {
+      opts.onStatus?.(statusText);
+      const localUrl = URL.createObjectURL(file);
+      const alt = file.name.replaceAll('"', "");
+      const before = new Set(editor.querySelectorAll("img"));
+      run("insertHTML", `<p><img src="${localUrl}" alt="${alt}" width="280" style="width:280px;max-width:100%;height:auto"></p><p><br></p>`);
+      const img = Array.from(editor.querySelectorAll("img")).find((node) => !before.has(node)) || null;
+      if (img)
+        selectImage(img);
+      const result = await uploadErpFile({
+        file,
+        doctype: opts.concernName ? "Sprint Backlogs" : undefined,
+        docname: opts.concernName,
+        isPrivate: false
+      });
+      if (!result.ok) {
+        opts.onStatus?.(result.error);
+        return;
+      }
+      const erpUrl = result.fileUrl.replaceAll('"', "");
+      if (img?.isConnected) {
+        img.setAttribute("data-erp-src", erpUrl);
+        hydrateErpImages(editor);
+      }
+      opts.onStatus?.("Image attached — click it, drag the corner to resize.");
     };
     toolbar.addEventListener("mousedown", (event) => {
       event.preventDefault();
@@ -786,28 +936,23 @@
         return;
       syncToolbarState();
     });
+    editor.addEventListener("click", (event) => {
+      const img = event.target?.closest("img");
+      if (img && editor.contains(img)) {
+        event.preventDefault();
+        selectImage(img);
+        return;
+      }
+      if (!event.target?.closest(".giya-img-resize")) {
+        clearImageSelection();
+      }
+    });
     fileInput.addEventListener("change", () => {
       const file = fileInput.files?.[0];
       fileInput.value = "";
       if (!file)
         return;
-      (async () => {
-        opts.onStatus?.("Uploading image to Livro…");
-        const result = await uploadErpFile({
-          file,
-          doctype: opts.concernName ? "Sprint Backlogs" : undefined,
-          docname: opts.concernName,
-          isPrivate: true
-        });
-        if (!result.ok) {
-          opts.onStatus?.(result.error);
-          return;
-        }
-        editor.focus();
-        const safeUrl = result.fileUrl.replaceAll('"', "");
-        run("insertHTML", `<p><img src="${safeUrl}" alt="${file.name.replaceAll('"', "")}"></p><p><br></p>`);
-        opts.onStatus?.("Image attached.");
-      })();
+      insertImageFromFile(file, "Uploading image to Livro…");
     });
     editor.addEventListener("paste", (event) => {
       const item = Array.from(event.clipboardData?.items || []).find((i) => i.type.startsWith("image/"));
@@ -817,25 +962,10 @@
       if (!file)
         return;
       event.preventDefault();
-      (async () => {
-        opts.onStatus?.("Uploading pasted image…");
-        const result = await uploadErpFile({
-          file,
-          doctype: opts.concernName ? "Sprint Backlogs" : undefined,
-          docname: opts.concernName,
-          isPrivate: true
-        });
-        if (!result.ok) {
-          opts.onStatus?.(result.error);
-          return;
-        }
-        const safeUrl = result.fileUrl.replaceAll('"', "");
-        run("insertHTML", `<p><img src="${safeUrl}" alt="pasted image"></p><p><br></p>`);
-        opts.onStatus?.("Image attached.");
-      })();
+      insertImageFromFile(file, "Uploading pasted image…");
     });
     return {
-      getHtml: () => sanitizeCommentHtml(editor.innerHTML),
+      getHtml: () => exportEditorHtml(editor),
       setDisabled: (disabled) => {
         editor.contentEditable = disabled ? "false" : "true";
         toolbar.querySelectorAll("button").forEach((b) => {
@@ -843,6 +973,7 @@
         });
       },
       clear: () => {
+        clearImageSelection();
         editor.innerHTML = "";
         syncToolbarState();
       },
@@ -1513,6 +1644,7 @@
             setReplyTarget(id);
         });
       });
+      hydrateErpImages(listEl);
     };
     const reloadThread = async () => {
       const result = await listPinThread(root.concernName, threadId);
@@ -2957,5 +3089,5 @@
   }
 })();
 
-//# debugId=A48E70A826130BE564756E2164756E21
+//# debugId=3DFF5F7CAD8541DF64756E2164756E21
 //# sourceMappingURL=widget.js.map

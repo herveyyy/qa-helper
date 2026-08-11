@@ -1,4 +1,7 @@
 import { ERP_BASE_URL, normalizeErpBaseUrl } from "../../../entities/erpnext.type";
+import { ensureErpSidCookie } from "../auth/ensure_erp_sid_cookie.usecase";
+import { getGiyaConnection } from "../auth/giya_erp_connection.usecase";
+import { readErpIdentityCookies } from "../auth/read_erp_identity_cookies.usecase";
 
 function headersToRecord(headers?: HeadersInit): Record<string, string> {
   if (!headers) return {};
@@ -15,7 +18,10 @@ function headersToRecord(headers?: HeadersInit): Record<string, string> {
   return { ...headers };
 }
 
-async function readCsrfToken(site: string): Promise<string | null> {
+type CsrfCache = { sid: string; token: string; at: number };
+let csrfCache: CsrfCache | null = null;
+
+async function readCsrfCookie(site: string): Promise<string | null> {
   try {
     const cookie = await chrome.cookies.get({ url: site, name: "csrf_token" });
     const raw = cookie?.value?.trim();
@@ -62,44 +68,94 @@ function scrapeCsrf(html: string): string | null {
   for (const re of patterns) {
     const match = re.exec(html);
     const token = match?.[1]?.trim();
-    if (token) return token;
+    if (token && token !== "{{ csrf_token }}" && token.length >= 8) {
+      return token;
+    }
   }
   return null;
 }
 
-/** Warm csrf_token cookie when Connect/Desk left the jar without one. */
-async function ensureCsrfToken(site: string): Promise<string | null> {
-  const existing = await readCsrfToken(site);
-  if (existing) return existing;
+/**
+ * Fresh CSRF from Desk `/app` boot (matches server session).
+ * Do not trust a leftover csrf_token cookie — it often mismatches the sid session.
+ */
+async function ensureCsrfToken(
+  site: string,
+  options: { force?: boolean } = {}
+): Promise<string | null> {
+  const connection = await getGiyaConnection();
+  const identity = await readErpIdentityCookies(site);
+  const sid = (identity?.sid || connection?.sid || "").trim();
+  if (!sid || sid === "Guest") return null;
 
-  try {
-    // Authenticated GET — no CSRF header required; Frappe often sets the cookie.
-    await fetch(`${site}/api/method/frappe.auth.get_logged_user`, {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-  } catch {
-    /* ignore */
+  if (
+    !options.force &&
+    csrfCache &&
+    csrfCache.sid === sid &&
+    Date.now() - csrfCache.at < 5 * 60_000
+  ) {
+    return csrfCache.token;
   }
 
-  let token = await readCsrfToken(site);
-  if (token) return token;
+  await ensureErpSidCookie(site, sid, {
+    userId: identity?.userId || connection?.email || undefined,
+    fullName: identity?.fullName || connection?.fullName || undefined,
+  });
 
   try {
     const res = await fetch(`${site}/app`, {
       method: "GET",
       credentials: "include",
       cache: "no-store",
+      headers: { Accept: "text/html" },
     });
     const html = await res.text();
-    token = scrapeCsrf(html) || (await readCsrfToken(site));
-    if (token) await writeCsrfCookie(site, token);
-    return token;
+
+    // /app as Guest can Set-Cookie sid=Guest — put Connect sid back.
+    await ensureErpSidCookie(site, sid, {
+      userId: identity?.userId || connection?.email || undefined,
+      fullName: identity?.fullName || connection?.fullName || undefined,
+    });
+
+    const token = scrapeCsrf(html);
+    if (token) {
+      csrfCache = { sid, token, at: Date.now() };
+      await writeCsrfCookie(site, token);
+      return token;
+    }
   } catch {
-    return readCsrfToken(site);
+    await ensureErpSidCookie(site, sid, {
+      userId: identity?.userId || connection?.email || undefined,
+      fullName: identity?.fullName || connection?.fullName || undefined,
+    });
   }
+
+  // Last resort only (often stale).
+  return readCsrfCookie(site);
+}
+
+function injectCsrfIntoBody(init: RequestInit, csrf: string): RequestInit {
+  const body = init.body;
+  if (!body) return init;
+
+  if (body instanceof FormData) {
+    if (!body.has("csrf_token")) body.append("csrf_token", csrf);
+    return init;
+  }
+
+  if (typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body) as Record<string, unknown>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        if (parsed.csrf_token == null) parsed.csrf_token = csrf;
+        return { ...init, body: JSON.stringify(parsed) };
+      }
+    } catch {
+      /* not JSON */
+    }
+  }
+
+  return init;
 }
 
 async function looksLikeCsrfFailure(res: Response): Promise<boolean> {
@@ -119,7 +175,7 @@ async function looksLikeCsrfFailure(res: Response): Promise<boolean> {
 export async function erpFetch(
   url: string,
   init: RequestInit = {},
-  timeoutMs = 15_000
+  timeoutMs = 20_000
 ): Promise<Response> {
   const site = normalizeErpBaseUrl(url) || ERP_BASE_URL;
   const method = (init.method || "GET").toUpperCase();
@@ -129,6 +185,7 @@ export async function erpFetch(
   const timer = setTimeout(() => controller.abort("ERP_TIMEOUT"), timeoutMs);
 
   try {
+    let requestInit = init;
     const headers = headersToRecord(init.headers);
     headers.Accept = headers.Accept || "application/json";
     if (init.body instanceof FormData) {
@@ -138,27 +195,31 @@ export async function erpFetch(
 
     if (needsCsrf) {
       const csrf = await ensureCsrfToken(site);
-      if (csrf) headers["X-Frappe-CSRF-Token"] = csrf;
+      if (csrf) {
+        headers["X-Frappe-CSRF-Token"] = csrf;
+        requestInit = injectCsrfIntoBody(init, csrf);
+      }
     }
 
-    const doFetch = () =>
+    const doFetch = (next: RequestInit) =>
       fetch(url, {
-        ...init,
+        ...next,
         credentials: "include",
         cache: "no-store",
         signal: controller.signal,
         headers,
       });
 
-    let res = await doFetch();
+    let res = await doFetch(requestInit);
 
-    // Stale csrf cookie → refresh once and retry.
     if (needsCsrf && (await looksLikeCsrfFailure(res))) {
+      csrfCache = null;
       await clearCsrfCookie(site);
-      const csrf = await ensureCsrfToken(site);
+      const csrf = await ensureCsrfToken(site, { force: true });
       if (csrf) {
         headers["X-Frappe-CSRF-Token"] = csrf;
-        res = await doFetch();
+        requestInit = injectCsrfIntoBody(init, csrf);
+        res = await doFetch(requestInit);
       }
     }
 

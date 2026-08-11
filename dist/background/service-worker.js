@@ -417,7 +417,8 @@
     }
     return { ...headers };
   }
-  async function readCsrfToken(site) {
+  var csrfCache = null;
+  async function readCsrfCookie(site) {
     try {
       const cookie = await chrome.cookies.get({ url: site, name: "csrf_token" });
       const raw = cookie?.value?.trim();
@@ -458,40 +459,71 @@
     for (const re of patterns) {
       const match = re.exec(html);
       const token = match?.[1]?.trim();
-      if (token)
+      if (token && token !== "{{ csrf_token }}" && token.length >= 8) {
         return token;
+      }
     }
     return null;
   }
-  async function ensureCsrfToken(site) {
-    const existing = await readCsrfToken(site);
-    if (existing)
-      return existing;
-    try {
-      await fetch(`${site}/api/method/frappe.auth.get_logged_user`, {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" }
-      });
-    } catch {}
-    let token = await readCsrfToken(site);
-    if (token)
-      return token;
+  async function ensureCsrfToken(site, options = {}) {
+    const connection = await getGiyaConnection();
+    const identity = await readErpIdentityCookies(site);
+    const sid = (identity?.sid || connection?.sid || "").trim();
+    if (!sid || sid === "Guest")
+      return null;
+    if (!options.force && csrfCache && csrfCache.sid === sid && Date.now() - csrfCache.at < 5 * 60000) {
+      return csrfCache.token;
+    }
+    await ensureErpSidCookie(site, sid, {
+      userId: identity?.userId || connection?.email || undefined,
+      fullName: identity?.fullName || connection?.fullName || undefined
+    });
     try {
       const res = await fetch(`${site}/app`, {
         method: "GET",
         credentials: "include",
-        cache: "no-store"
+        cache: "no-store",
+        headers: { Accept: "text/html" }
       });
       const html = await res.text();
-      token = scrapeCsrf(html) || await readCsrfToken(site);
-      if (token)
+      await ensureErpSidCookie(site, sid, {
+        userId: identity?.userId || connection?.email || undefined,
+        fullName: identity?.fullName || connection?.fullName || undefined
+      });
+      const token = scrapeCsrf(html);
+      if (token) {
+        csrfCache = { sid, token, at: Date.now() };
         await writeCsrfCookie(site, token);
-      return token;
+        return token;
+      }
     } catch {
-      return readCsrfToken(site);
+      await ensureErpSidCookie(site, sid, {
+        userId: identity?.userId || connection?.email || undefined,
+        fullName: identity?.fullName || connection?.fullName || undefined
+      });
     }
+    return readCsrfCookie(site);
+  }
+  function injectCsrfIntoBody(init, csrf) {
+    const body = init.body;
+    if (!body)
+      return init;
+    if (body instanceof FormData) {
+      if (!body.has("csrf_token"))
+        body.append("csrf_token", csrf);
+      return init;
+    }
+    if (typeof body === "string") {
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          if (parsed.csrf_token == null)
+            parsed.csrf_token = csrf;
+          return { ...init, body: JSON.stringify(parsed) };
+        }
+      } catch {}
+    }
+    return init;
   }
   async function looksLikeCsrfFailure(res) {
     if (res.status !== 400 && res.status !== 403)
@@ -503,13 +535,14 @@
       return false;
     }
   }
-  async function erpFetch(url, init = {}, timeoutMs = 15000) {
+  async function erpFetch(url, init = {}, timeoutMs = 20000) {
     const site = normalizeErpBaseUrl(url) || ERP_BASE_URL;
     const method = (init.method || "GET").toUpperCase();
     const needsCsrf = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
     const controller = new AbortController;
     const timer = setTimeout(() => controller.abort("ERP_TIMEOUT"), timeoutMs);
     try {
+      let requestInit = init;
       const headers = headersToRecord(init.headers);
       headers.Accept = headers.Accept || "application/json";
       if (init.body instanceof FormData) {
@@ -518,23 +551,27 @@
       }
       if (needsCsrf) {
         const csrf = await ensureCsrfToken(site);
-        if (csrf)
+        if (csrf) {
           headers["X-Frappe-CSRF-Token"] = csrf;
+          requestInit = injectCsrfIntoBody(init, csrf);
+        }
       }
-      const doFetch = () => fetch(url, {
-        ...init,
+      const doFetch = (next) => fetch(url, {
+        ...next,
         credentials: "include",
         cache: "no-store",
         signal: controller.signal,
         headers
       });
-      let res = await doFetch();
+      let res = await doFetch(requestInit);
       if (needsCsrf && await looksLikeCsrfFailure(res)) {
+        csrfCache = null;
         await clearCsrfCookie(site);
-        const csrf = await ensureCsrfToken(site);
+        const csrf = await ensureCsrfToken(site, { force: true });
         if (csrf) {
           headers["X-Frappe-CSRF-Token"] = csrf;
-          res = await doFetch();
+          requestInit = injectCsrfIntoBody(init, csrf);
+          res = await doFetch(requestInit);
         }
       }
       return res;
@@ -905,13 +942,26 @@
       const value = (src?.[2] || src?.[3] || src?.[4] || "").trim();
       if (/^(https?:|\/)/i.test(value) || /^data:image\//i.test(value)) {
         kept.push(`src="${value.replaceAll('"', "")}"`);
-        kept.push('style="max-width:100%;height:auto"');
       } else {
         return "";
       }
       const alt = attrs.match(/\balt\s*=\s*("([^"]*)"|'([^']*)')/i);
       if (alt)
         kept.push(`alt="${(alt[2] || alt[3] || "").replaceAll('"', "")}"`);
+      const width = attrs.match(/\bwidth\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const widthVal = (width?.[2] || width?.[3] || width?.[4] || "").trim();
+      if (/^\d{1,4}(px)?$/i.test(widthVal)) {
+        kept.push(`width="${widthVal.replace(/px$/i, "")}"`);
+      }
+      const style = attrs.match(/\bstyle\s*=\s*("([^"]*)"|'([^']*)')/i);
+      const styleRaw = style?.[2] || style?.[3] || "";
+      const widthMatch = styleRaw.match(/(?:^|;)\s*width\s*:\s*(\d{1,4})px/i);
+      const parts = ["max-width:100%", "height:auto"];
+      if (widthMatch?.[1])
+        parts.unshift(`width:${widthMatch[1]}px`);
+      else if (widthVal)
+        parts.unshift(`width:${widthVal.replace(/px$/i, "")}px`);
+      kept.push(`style="${parts.join(";")}"`);
     }
     return kept.length ? `<${tag} ${kept.join(" ")}>` : `<${tag}>`;
   }
@@ -1395,6 +1445,57 @@
     }
   }
 
+  // lib/domain/usecases/erpnext/fetch_erp_file_data.usecase.ts
+  async function fetchErpFileDataUrl(fileUrl, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const raw = fileUrl.trim();
+    if (!raw)
+      return { ok: false, error: "Missing file URL." };
+    let absolute = raw;
+    if (raw.startsWith("/"))
+      absolute = `${site}${raw}`;
+    try {
+      const host = new URL(absolute).hostname.toLowerCase();
+      if (host !== "erp.livro.systems" && host !== "www.erp.livro.systems") {
+        return { ok: false, error: "Only Livro file URLs can be loaded." };
+      }
+    } catch {
+      return { ok: false, error: "Invalid file URL." };
+    }
+    try {
+      const res = await erpFetch(absolute, { method: "GET" }, 30000);
+      if (!res.ok) {
+        return { ok: false, error: `Could not load image (${res.status}).` };
+      }
+      const buffer = await res.arrayBuffer();
+      if (buffer.byteLength > 6 * 1024 * 1024) {
+        return { ok: false, error: "Image too large to preview." };
+      }
+      const mimeType = res.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      const chunk = 32768;
+      for (let i = 0;i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      return {
+        ok: true,
+        data: {
+          mimeType,
+          dataUrl: `data:${mimeType};base64,${btoa(binary)}`
+        }
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to load image.")
+      };
+    }
+  }
+
   // lib/domain/usecases/erpnext/upload_erp_file.usecase.ts
   function decodeBase64(base64) {
     const binary = atob(base64);
@@ -1523,6 +1624,9 @@
   }
   async function uploadErpFile2(input, baseUrl = ERP_BASE_URL) {
     return uploadErpFile(input, baseUrl);
+  }
+  async function fetchErpFileDataUrl2(fileUrl, baseUrl = ERP_BASE_URL) {
+    return fetchErpFileDataUrl(fileUrl, baseUrl);
   }
   async function listPagePinComments2(pageHref, baseUrl = ERP_BASE_URL, options = {}) {
     const session = await getExtensionSession(baseUrl);
@@ -1746,6 +1850,15 @@
         fileName: result.data.fileName
       } : { type: "ERP_FILE", ok: false, error: result.error };
     }
+    if (message.type === "FETCH_ERP_FILE_DATA") {
+      const result = await fetchErpFileDataUrl2(message.url, ERP_BASE_URL);
+      return result.ok ? {
+        type: "ERP_FILE_DATA",
+        ok: true,
+        dataUrl: result.data.dataUrl,
+        mimeType: result.data.mimeType
+      } : { type: "ERP_FILE_DATA", ok: false, error: result.error };
+    }
     if (message.type === "OPEN_LOGIN_PAGE") {
       openExtensionLoginPage();
       return { type: "OPENED_LOGIN" };
@@ -1807,5 +1920,5 @@
   });
 })();
 
-//# debugId=66FC4A8EF236AAC164756E2164756E21
+//# debugId=EBD8E153445CA2FB64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

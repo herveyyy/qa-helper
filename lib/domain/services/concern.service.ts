@@ -18,6 +18,7 @@ import {
 import { listAssigneeConcerns as listAssigneeConcernsUseCase } from "../usecases/concern/list_assignee_concerns.usecase";
 import { listPagePinComments as listPagePinCommentsUseCase } from "../usecases/concern/list_page_pin_comments.usecase";
 import { listPinThreadComments as listPinThreadCommentsUseCase } from "../usecases/concern/list_pin_thread.usecase";
+import { fetchErpFileDataUrl as fetchErpFileDataUrlUseCase } from "../usecases/erpnext/fetch_erp_file_data.usecase";
 import {
   uploadErpFile as uploadErpFileUseCase,
   type UploadErpFileInput,
@@ -134,6 +135,13 @@ export async function uploadErpFile(
   baseUrl: string = ERP_BASE_URL
 ) {
   return uploadErpFileUseCase(input, baseUrl);
+}
+
+export async function fetchErpFileDataUrl(
+  fileUrl: string,
+  baseUrl: string = ERP_BASE_URL
+) {
+  return fetchErpFileDataUrlUseCase(fileUrl, baseUrl);
 }
 
 export async function listPagePinComments(

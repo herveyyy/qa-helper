@@ -4,6 +4,7 @@ import {
   isBlankCommentHtml,
   sanitizeCommentHtml,
 } from "../../../lib/domain/usecases/concern/sanitize_comment_html.usecase";
+import { hydrateErpImages } from "./image-preview.ts";
 
 export type RichEditorApi = {
   getHtml: () => string;
@@ -19,12 +20,30 @@ type MountOpts = {
   onStatus?: (message: string) => void;
 };
 
-function toolbarButton(
-  cmd: string,
-  label: string,
-  title: string
-): string {
+function toolbarButton(cmd: string, label: string, title: string): string {
   return `<button type="button" data-cmd="${cmd}" class="giya-rte-btn" title="${title}" aria-label="${title}">${label}</button>`;
+}
+
+function exportEditorHtml(editor: HTMLElement): string {
+  const clone = editor.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll(".giya-img-resize").forEach((node) => node.remove());
+  clone.querySelectorAll("img").forEach((img) => {
+    const erp = img.getAttribute("data-erp-src");
+    if (erp) img.setAttribute("src", erp);
+    img.removeAttribute("data-erp-src");
+    img.classList.remove("giya-img-selected", "giya-img-loading", "giya-img-broken");
+    const width = img.style.width || img.getAttribute("width");
+    if (width) {
+      const px = String(width).replace(/px$/i, "");
+      if (/^\d+$/.test(px)) {
+        img.setAttribute("width", px);
+        img.style.width = `${px}px`;
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+      }
+    }
+  });
+  return sanitizeCommentHtml(clone.innerHTML);
 }
 
 /** Frappe-like HTML comment editor (contenteditable + toolbar + image upload). */
@@ -62,6 +81,7 @@ export function mountRichCommentEditor(
   const editor = host.querySelector("[data-rte-editor]") as HTMLDivElement;
   const fileInput = host.querySelector("[data-rte-file]") as HTMLInputElement;
   const toolbar = host.querySelector(".giya-rte-toolbar") as HTMLElement;
+  let selectedImg: HTMLImageElement | null = null;
 
   const run = (command: string, value?: string) => {
     editor.focus();
@@ -98,8 +118,80 @@ export function mountRichCommentEditor(
     }
   };
 
+  const clearImageSelection = () => {
+    editor.querySelectorAll(".giya-img-selected").forEach((el) => {
+      el.classList.remove("giya-img-selected");
+    });
+    editor.querySelectorAll(".giya-img-resize").forEach((el) => el.remove());
+    selectedImg = null;
+  };
+
+  const selectImage = (img: HTMLImageElement) => {
+    clearImageSelection();
+    selectedImg = img;
+    img.classList.add("giya-img-selected");
+
+    const handle = document.createElement("span");
+    handle.className = "giya-img-resize";
+    handle.contentEditable = "false";
+    handle.title = "Drag to resize";
+    img.insertAdjacentElement("afterend", handle);
+
+    const onMove = (event: PointerEvent) => {
+      if (!selectedImg) return;
+      const rect = selectedImg.getBoundingClientRect();
+      const next = Math.max(80, Math.min(editor.clientWidth - 8, event.clientX - rect.left));
+      selectedImg.style.width = `${Math.round(next)}px`;
+      selectedImg.style.height = "auto";
+      selectedImg.setAttribute("width", String(Math.round(next)));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  };
+
+  const insertImageFromFile = async (file: File, statusText: string) => {
+    opts.onStatus?.(statusText);
+    const localUrl = URL.createObjectURL(file);
+    const alt = file.name.replaceAll('"', "");
+    const before = new Set(editor.querySelectorAll("img"));
+    run(
+      "insertHTML",
+      `<p><img src="${localUrl}" alt="${alt}" width="280" style="width:280px;max-width:100%;height:auto"></p><p><br></p>`
+    );
+    const img =
+      Array.from(editor.querySelectorAll("img")).find((node) => !before.has(node)) ||
+      null;
+    if (img) selectImage(img);
+
+    // Public so Desk + Faye can preview without private-file cookie issues.
+    const result = await uploadErpFile({
+      file,
+      doctype: opts.concernName ? "Sprint Backlogs" : undefined,
+      docname: opts.concernName,
+      isPrivate: false,
+    });
+    if (!result.ok) {
+      opts.onStatus?.(result.error);
+      return;
+    }
+
+    const erpUrl = result.fileUrl.replaceAll('"', "");
+    if (img?.isConnected) {
+      img.setAttribute("data-erp-src", erpUrl);
+      void hydrateErpImages(editor);
+    }
+    opts.onStatus?.("Image attached — click it, drag the corner to resize.");
+  };
+
   toolbar.addEventListener("mousedown", (event) => {
-    // Keep selection in the editor.
     event.preventDefault();
   });
 
@@ -138,30 +230,23 @@ export function mountRichCommentEditor(
     syncToolbarState();
   });
 
+  editor.addEventListener("click", (event) => {
+    const img = (event.target as HTMLElement | null)?.closest("img");
+    if (img && editor.contains(img)) {
+      event.preventDefault();
+      selectImage(img as HTMLImageElement);
+      return;
+    }
+    if (!(event.target as HTMLElement | null)?.closest(".giya-img-resize")) {
+      clearImageSelection();
+    }
+  });
+
   fileInput.addEventListener("change", () => {
     const file = fileInput.files?.[0];
     fileInput.value = "";
     if (!file) return;
-    void (async () => {
-      opts.onStatus?.("Uploading image to Livro…");
-      const result = await uploadErpFile({
-        file,
-        doctype: opts.concernName ? "Sprint Backlogs" : undefined,
-        docname: opts.concernName,
-        isPrivate: true,
-      });
-      if (!result.ok) {
-        opts.onStatus?.(result.error);
-        return;
-      }
-      editor.focus();
-      const safeUrl = result.fileUrl.replaceAll('"', "");
-      run(
-        "insertHTML",
-        `<p><img src="${safeUrl}" alt="${file.name.replaceAll('"', "")}"></p><p><br></p>`
-      );
-      opts.onStatus?.("Image attached.");
-    })();
+    void insertImageFromFile(file, "Uploading image to Livro…");
   });
 
   editor.addEventListener("paste", (event) => {
@@ -172,29 +257,11 @@ export function mountRichCommentEditor(
     const file = item.getAsFile();
     if (!file) return;
     event.preventDefault();
-    void (async () => {
-      opts.onStatus?.("Uploading pasted image…");
-      const result = await uploadErpFile({
-        file,
-        doctype: opts.concernName ? "Sprint Backlogs" : undefined,
-        docname: opts.concernName,
-        isPrivate: true,
-      });
-      if (!result.ok) {
-        opts.onStatus?.(result.error);
-        return;
-      }
-      const safeUrl = result.fileUrl.replaceAll('"', "");
-      run(
-        "insertHTML",
-        `<p><img src="${safeUrl}" alt="pasted image"></p><p><br></p>`
-      );
-      opts.onStatus?.("Image attached.");
-    })();
+    void insertImageFromFile(file, "Uploading pasted image…");
   });
 
   return {
-    getHtml: () => sanitizeCommentHtml(editor.innerHTML),
+    getHtml: () => exportEditorHtml(editor),
     setDisabled: (disabled) => {
       editor.contentEditable = disabled ? "false" : "true";
       toolbar.querySelectorAll("button").forEach((b) => {
@@ -202,6 +269,7 @@ export function mountRichCommentEditor(
       });
     },
     clear: () => {
+      clearImageSelection();
       editor.innerHTML = "";
       syncToolbarState();
     },

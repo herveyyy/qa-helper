@@ -56,12 +56,25 @@ function sanitizeOpenTag(raw: string): string {
     const value = (src?.[2] || src?.[3] || src?.[4] || "").trim();
     if (/^(https?:|\/)/i.test(value) || /^data:image\//i.test(value)) {
       kept.push(`src="${value.replaceAll('"', "")}"`);
-      kept.push('style="max-width:100%;height:auto"');
     } else {
       return "";
     }
     const alt = attrs.match(/\balt\s*=\s*("([^"]*)"|'([^']*)')/i);
     if (alt) kept.push(`alt="${(alt[2] || alt[3] || "").replaceAll('"', "")}"`);
+
+    const width = attrs.match(/\bwidth\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const widthVal = (width?.[2] || width?.[3] || width?.[4] || "").trim();
+    if (/^\d{1,4}(px)?$/i.test(widthVal)) {
+      kept.push(`width="${widthVal.replace(/px$/i, "")}"`);
+    }
+
+    const style = attrs.match(/\bstyle\s*=\s*("([^"]*)"|'([^']*)')/i);
+    const styleRaw = style?.[2] || style?.[3] || "";
+    const widthMatch = styleRaw.match(/(?:^|;)\s*width\s*:\s*(\d{1,4})px/i);
+    const parts = ["max-width:100%", "height:auto"];
+    if (widthMatch?.[1]) parts.unshift(`width:${widthMatch[1]}px`);
+    else if (widthVal) parts.unshift(`width:${widthVal.replace(/px$/i, "")}px`);
+    kept.push(`style="${parts.join(";")}"`);
   }
 
   return kept.length ? `<${tag} ${kept.join(" ")}>` : `<${tag}>`;

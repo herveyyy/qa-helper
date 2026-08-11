@@ -7,6 +7,7 @@
 @source "../content/element-picker.ts";
 @source "../content/auth-client.ts";
 @source "../content/concern-client.ts";
+@source "../content/widget/image-preview.ts";
 @source "../shared/avatar.ts";
 
 /* Host reset so page styles do not leak into the shadow tree */
@@ -248,10 +249,45 @@
 
 .giya-rte-editor img,
 .giya-comment-html img {
+  display: block;
   max-width: 100%;
   height: auto;
   border-radius: 0.4rem;
   margin: 0.35rem 0;
+  background: rgb(0 0 0 / 0.06);
+}
+
+.giya-rte-editor {
+  position: relative;
+}
+
+.giya-rte-editor img.giya-img-selected {
+  outline: 2px solid rgb(250 250 250);
+  outline-offset: 2px;
+}
+
+.giya-img-resize {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: -14px;
+  margin-bottom: 2px;
+  border-radius: 2px;
+  background: rgb(250 250 250);
+  border: 1px solid rgb(18 18 18);
+  cursor: nwse-resize;
+  vertical-align: bottom;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+
+.giya-img-loading {
+  opacity: 0.55;
+}
+
+.giya-img-broken {
+  outline: 1px dashed rgb(180 180 180);
+  min-width: 96px;
+  min-height: 64px;
 }
 
 .giya-comment-html p {

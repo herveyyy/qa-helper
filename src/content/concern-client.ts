@@ -162,3 +162,17 @@ export async function uploadErpFile(input: {
   }
   return { ok: false, error: "Reload this page — Faye was updated." };
 }
+
+export async function fetchErpFileDataUrl(
+  url: string
+): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> {
+  const response = await sendRuntimeMessage({
+    type: "FETCH_ERP_FILE_DATA",
+    url,
+  });
+  if (response?.type === "ERP_FILE_DATA") {
+    if (response.ok) return { ok: true, dataUrl: response.dataUrl };
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Faye was updated." };
+}

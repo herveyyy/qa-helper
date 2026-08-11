@@ -43,6 +43,7 @@ export type ExtensionRequest =
       docname?: string;
       isPrivate?: boolean;
     }
+  | { type: "FETCH_ERP_FILE_DATA"; url: string }
   | { type: "OPEN_LOGIN_PAGE" }
   | { type: "OPEN_USER_PAGE" }
   | { type: "OPEN_LIVRO_LOGIN" };
@@ -89,5 +90,7 @@ export type ExtensionResponse =
   | { type: "CONCERN_DEVOPS"; ok: false; error: string }
   | { type: "ERP_FILE"; ok: true; fileUrl: string; fileName: string }
   | { type: "ERP_FILE"; ok: false; error: string }
+  | { type: "ERP_FILE_DATA"; ok: true; dataUrl: string; mimeType: string }
+  | { type: "ERP_FILE_DATA"; ok: false; error: string }
   | { type: "OPENED_LOGIN" }
   | { type: "OPENED_USER" };

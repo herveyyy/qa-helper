@@ -12,6 +12,7 @@ import {
 import {
   addConcernPinComment,
   createAssigneeConcern,
+  fetchErpFileDataUrl,
   getConcernDevopsStatus,
   invalidateConcernCaches,
   listAssigneeConcerns,
@@ -207,6 +208,18 @@ async function handleMessage(message: ExtensionRequest): Promise<ExtensionRespon
           fileName: result.data.fileName,
         }
       : { type: "ERP_FILE", ok: false, error: result.error };
+  }
+
+  if (message.type === "FETCH_ERP_FILE_DATA") {
+    const result = await fetchErpFileDataUrl(message.url, ERP_BASE_URL);
+    return result.ok
+      ? {
+          type: "ERP_FILE_DATA",
+          ok: true,
+          dataUrl: result.data.dataUrl,
+          mimeType: result.data.mimeType,
+        }
+      : { type: "ERP_FILE_DATA", ok: false, error: result.error };
   }
 
   if (message.type === "OPEN_LOGIN_PAGE") {
