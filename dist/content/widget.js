@@ -38,6 +38,12 @@
     return hostname === lower || hostname.endsWith(`.${lower}`);
   }
 
+  // src/shared/brand.ts
+  var FAYE_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`;
+  function fayeLogoDataUrl() {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(FAYE_LOGO_SVG)}`;
+  }
+
   // src/shared/defaults.ts
   var DEFAULT_POSITION = "bottom-right";
   var DEFAULT_SIDEBAR_WIDTH = 360;
@@ -63,11 +69,12 @@
     allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
   function defaultIconUrl() {
-    return chrome.runtime.getURL("assets/giya-icon.png");
+    return fayeLogoDataUrl();
   }
 
   // src/content/icons.ts
   var ICONS = {
+    logo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`,
     back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg>`,
     comment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>`,
     environment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>`,
@@ -1891,11 +1898,12 @@
       <button
         type="button"
         data-fab
-        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
+        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 text-white shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
         aria-label="Open Faye"
         aria-expanded="false"
       >
-        <img data-fab-icon class="pointer-events-none h-4 w-4 rounded-full object-cover" alt="" draggable="false" />
+        <span data-fab-logo class="pointer-events-none grid place-items-center">${ICONS.logo}</span>
+        <img data-fab-icon class="pointer-events-none hidden h-4 w-4 rounded-full object-cover" alt="" draggable="false" />
       </button>
     `;
   }
@@ -1956,6 +1964,7 @@
         pickHint: requireEl(root, "[data-pick-hint]"),
         pinLayer: requireEl(root, "[data-pin-layer]"),
         fab: requireEl(root, "[data-fab]"),
+        fabLogo: requireEl(root, "[data-fab-logo]"),
         fabIcon: requireEl(root, "[data-fab-icon]"),
         btnNav: requireEl(root, "[data-nav]"),
         btnEnv: requireEl(root, "[data-env]"),
@@ -2250,8 +2259,12 @@
       const els = this.els;
       if (!els)
         return;
-      this.config.iconUrl = iconUrl || defaultIconUrl();
-      els.fabIcon.src = this.config.iconUrl;
+      const custom = Boolean(iconUrl && iconUrl.trim());
+      this.config.iconUrl = custom ? iconUrl : defaultIconUrl();
+      els.fabLogo.hidden = custom;
+      els.fabIcon.hidden = !custom;
+      if (custom)
+        els.fabIcon.src = iconUrl;
     }
     applyFabCoords(coords) {
       const els = this.els;
@@ -3089,5 +3102,5 @@
   }
 })();
 
-//# debugId=3DFF5F7CAD8541DF64756E2164756E21
+//# debugId=4B8E859F276C3AD564756E2164756E21
 //# sourceMappingURL=widget.js.map

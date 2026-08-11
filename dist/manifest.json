@@ -4,16 +4,16 @@
   "version": "0.1.0",
   "manifest_version": 3,
   "icons": {
-    "16": "assets/giya-icon.png",
-    "48": "assets/giya-icon.png",
-    "128": "assets/giya-icon.png"
+    "16": "assets/faye-icon-16.png",
+    "48": "assets/faye-icon-48.png",
+    "128": "assets/faye-icon-128.png"
   },
   "action": {
     "default_title": "Faye",
     "default_icon": {
-      "16": "assets/giya-icon.png",
-      "48": "assets/giya-icon.png",
-      "128": "assets/giya-icon.png"
+      "16": "assets/faye-icon-16.png",
+      "48": "assets/faye-icon-48.png",
+      "128": "assets/faye-icon-128.png"
     }
   },
   "background": {
@@ -27,7 +27,13 @@
   "host_permissions": ["<all_urls>", "https://erp.livro.systems/*"],
   "web_accessible_resources": [
     {
-      "resources": ["assets/giya-icon.png", "content/widget.css"],
+      "resources": [
+        "assets/faye-icon.svg",
+        "assets/faye-icon-16.png",
+        "assets/faye-icon-48.png",
+        "assets/faye-icon-128.png",
+        "content/widget.css"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

@@ -1,8 +1,14 @@
 (() => {
+  // src/shared/brand.ts
+  var FAYE_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`;
+  function fayeLogoDataUrl() {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(FAYE_LOGO_SVG)}`;
+  }
+
   // src/shared/defaults.ts
   var DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
   function defaultIconUrl() {
-    return chrome.runtime.getURL("assets/giya-icon.png");
+    return fayeLogoDataUrl();
   }
 
   // src/options/options.ts
@@ -147,5 +153,5 @@
   refreshOrigins();
 })();
 
-//# debugId=4F340C0FE1C447CD64756E2164756E21
+//# debugId=168AE42BB35CD28264756E2164756E21
 //# sourceMappingURL=options.js.map
