@@ -19,7 +19,13 @@ async function sendMessage(
     return (await chrome.runtime.sendMessage(message)) as ExtensionResponse;
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
-    if (text.includes("Extension context invalidated")) return null;
+    if (
+      text.includes("Extension context invalidated") ||
+      text.includes("message channel closed") ||
+      text.includes("Receiving end does not exist")
+    ) {
+      return null;
+    }
     throw error;
   }
 }

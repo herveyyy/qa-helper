@@ -39,166 +39,150 @@ chrome.runtime.onInstalled.addListener(() => {
   })();
 });
 
-chrome.runtime.onMessage.addListener((message: ExtensionRequest, _sender, sendResponse) => {
-  void (async () => {
-    if (message.type === "PEEK_SID") {
-      const hasSid = await peekSid(ERP_BASE_URL);
-      sendResponse({ type: "PEEK_SID", hasSid } satisfies ExtensionResponse);
-      return;
-    }
+async function handleMessage(message: ExtensionRequest): Promise<ExtensionResponse> {
+  if (message.type === "PEEK_SID") {
+    const hasSid = await peekSid(ERP_BASE_URL);
+    return { type: "PEEK_SID", hasSid };
+  }
 
-    if (message.type === "GET_CONNECTION") {
-      const connection = await peekConnection();
-      sendResponse({ type: "CONNECTION", ok: true, connection } satisfies ExtensionResponse);
-      return;
-    }
+  if (message.type === "GET_CONNECTION") {
+    const connection = await peekConnection();
+    return { type: "CONNECTION", ok: true, connection };
+  }
 
-    if (message.type === "CONNECT_ERP") {
-      const input =
-        message.tmpId && message.otp
-          ? { tmp_id: message.tmpId, otp: message.otp, usr: message.usr }
-          : { usr: message.usr || "", pwd: message.pwd || "" };
-      const result = await connectErp(input);
-      if (!result.ok) {
-        sendResponse({
-          type: "CONNECT_ERP",
-          ok: false,
-          error: result.error,
-        } satisfies ExtensionResponse);
-        return;
-      }
-      if ("needsOtp" in result.data && result.data.needsOtp) {
-        sendResponse({
-          type: "CONNECT_ERP",
-          ok: true,
-          needsOtp: true,
-          tmpId: result.data.tmpId,
-          prompt: result.data.prompt,
-          method: result.data.method,
-        } satisfies ExtensionResponse);
-        return;
-      }
-      sendResponse({
+  if (message.type === "CONNECT_ERP") {
+    const input =
+      message.tmpId && message.otp
+        ? { tmp_id: message.tmpId, otp: message.otp, usr: message.usr }
+        : { usr: message.usr || "", pwd: message.pwd || "" };
+    const result = await connectErp(input);
+    if (!result.ok) {
+      return { type: "CONNECT_ERP", ok: false, error: result.error };
+    }
+    if ("needsOtp" in result.data && result.data.needsOtp) {
+      return {
         type: "CONNECT_ERP",
         ok: true,
-        connection: result.data.connection,
-      } satisfies ExtensionResponse);
-      return;
+        needsOtp: true,
+        tmpId: result.data.tmpId,
+        prompt: result.data.prompt,
+        method: result.data.method,
+      };
     }
+    return {
+      type: "CONNECT_ERP",
+      ok: true,
+      connection: result.data.connection,
+    };
+  }
 
-    if (message.type === "CONNECT_ERP_DESK") {
-      const result = await connectErpFromDesk(ERP_BASE_URL);
-      if (!result.ok) {
-        sendResponse({
-          type: "CONNECT_ERP",
-          ok: false,
-          error: result.error,
-        } satisfies ExtensionResponse);
-        return;
-      }
-      sendResponse({
-        type: "CONNECT_ERP",
-        ok: true,
-        connection: result.data,
-      } satisfies ExtensionResponse);
-      return;
+  if (message.type === "CONNECT_ERP_DESK") {
+    const result = await connectErpFromDesk(ERP_BASE_URL);
+    if (!result.ok) {
+      return { type: "CONNECT_ERP", ok: false, error: result.error };
     }
+    return { type: "CONNECT_ERP", ok: true, connection: result.data };
+  }
 
-    if (message.type === "DISCONNECT_ERP") {
-      await disconnectErp();
-      sendResponse({ type: "DISCONNECTED" } satisfies ExtensionResponse);
-      return;
-    }
+  if (message.type === "DISCONNECT_ERP") {
+    await disconnectErp();
+    return { type: "DISCONNECTED" };
+  }
 
-    if (message.type === "GET_SESSION") {
-      const result = await getSession(ERP_BASE_URL, { force: Boolean(message.force) });
-      const response: ExtensionResponse = result.ok
-        ? { type: "SESSION", ok: true, session: result.data }
-        : { type: "SESSION", ok: false, error: result.error };
-      sendResponse(response);
-      return;
-    }
+  if (message.type === "GET_SESSION") {
+    const result = await getSession(ERP_BASE_URL, { force: Boolean(message.force) });
+    return result.ok
+      ? { type: "SESSION", ok: true, session: result.data }
+      : { type: "SESSION", ok: false, error: result.error };
+  }
 
-    if (message.type === "GET_USER_PROFILE") {
-      const result = await getUserProfile(ERP_BASE_URL);
-      const response: ExtensionResponse = result.ok
-        ? { type: "USER_PROFILE", ok: true, profile: result.data }
-        : { type: "USER_PROFILE", ok: false, error: result.error };
-      sendResponse(response);
-      return;
-    }
+  if (message.type === "GET_USER_PROFILE") {
+    const result = await getUserProfile(ERP_BASE_URL);
+    return result.ok
+      ? { type: "USER_PROFILE", ok: true, profile: result.data }
+      : { type: "USER_PROFILE", ok: false, error: result.error };
+  }
 
-    if (message.type === "LIST_CONCERNS") {
-      const result = await listAssigneeConcerns(ERP_BASE_URL);
-      const response: ExtensionResponse = result.ok
-        ? { type: "CONCERNS", ok: true, concerns: result.data }
-        : { type: "CONCERNS", ok: false, error: result.error };
-      sendResponse(response);
-      return;
-    }
+  if (message.type === "LIST_CONCERNS") {
+    const result = await listAssigneeConcerns(ERP_BASE_URL);
+    return result.ok
+      ? { type: "CONCERNS", ok: true, concerns: result.data }
+      : { type: "CONCERNS", ok: false, error: result.error };
+  }
 
-    if (message.type === "CREATE_CONCERN") {
-      const result = await createAssigneeConcern(
-        {
-          subject: message.subject,
-          type: message.concernType,
-          priority: message.priority,
-          description: message.description,
-        },
-        ERP_BASE_URL
-      );
-      const response: ExtensionResponse = result.ok
-        ? { type: "CONCERN_CREATED", ok: true, concern: result.data }
-        : { type: "CONCERN_CREATED", ok: false, error: result.error };
-      sendResponse(response);
-      return;
-    }
+  if (message.type === "CREATE_CONCERN") {
+    const result = await createAssigneeConcern(
+      {
+        subject: message.subject,
+        type: message.concernType,
+        priority: message.priority,
+        description: message.description,
+      },
+      ERP_BASE_URL
+    );
+    return result.ok
+      ? { type: "CONCERN_CREATED", ok: true, concern: result.data }
+      : { type: "CONCERN_CREATED", ok: false, error: result.error };
+  }
 
-    if (message.type === "LIST_PAGE_PINS") {
-      const result = await listPagePinComments(message.href, ERP_BASE_URL);
-      const response: ExtensionResponse = result.ok
-        ? { type: "PAGE_PINS", ok: true, pins: result.data }
-        : { type: "PAGE_PINS", ok: false, error: result.error };
-      sendResponse(response);
-      return;
-    }
+  if (message.type === "LIST_PAGE_PINS") {
+    const result = await listPagePinComments(message.href, ERP_BASE_URL);
+    return result.ok
+      ? { type: "PAGE_PINS", ok: true, pins: result.data }
+      : { type: "PAGE_PINS", ok: false, error: result.error };
+  }
 
-    if (message.type === "ADD_CONCERN_PIN") {
-      const result = await addConcernPinComment(
-        message.concernName,
-        message.pin,
-        ERP_BASE_URL
-      );
-      const response: ExtensionResponse = result.ok
-        ? { type: "PIN_SAVED", ok: true, commentName: result.data.commentName }
-        : { type: "PIN_SAVED", ok: false, error: result.error };
-      sendResponse(response);
-      return;
-    }
+  if (message.type === "ADD_CONCERN_PIN") {
+    const result = await addConcernPinComment(
+      message.concernName,
+      message.pin,
+      ERP_BASE_URL
+    );
+    return result.ok
+      ? { type: "PIN_SAVED", ok: true, commentName: result.data.commentName }
+      : { type: "PIN_SAVED", ok: false, error: result.error };
+  }
 
-    if (message.type === "OPEN_LOGIN_PAGE") {
+  if (message.type === "OPEN_LOGIN_PAGE") {
+    openExtensionLoginPage();
+    return { type: "OPENED_LOGIN" };
+  }
+
+  if (message.type === "OPEN_USER_PAGE") {
+    const result = await getSession(ERP_BASE_URL);
+    if (!result.ok) {
       openExtensionLoginPage();
-      sendResponse({ type: "OPENED_LOGIN" } satisfies ExtensionResponse);
-      return;
+      return { type: "OPENED_LOGIN" };
     }
+    openUserPage();
+    return { type: "OPENED_USER" };
+  }
 
-    if (message.type === "OPEN_USER_PAGE") {
-      const result = await getSession(ERP_BASE_URL);
-      if (!result.ok) {
-        openExtensionLoginPage();
-        sendResponse({ type: "OPENED_LOGIN" } satisfies ExtensionResponse);
-        return;
+  if (message.type === "OPEN_LIVRO_LOGIN") {
+    openLivroLogin(ERP_BASE_URL);
+    return { type: "OPENED_LOGIN" };
+  }
+
+  return { type: "SESSION", ok: false, error: "Unknown message." };
+}
+
+chrome.runtime.onMessage.addListener((message: ExtensionRequest, _sender, sendResponse) => {
+  void handleMessage(message)
+    .then((response) => {
+      try {
+        sendResponse(response);
+      } catch {
+        // Channel already closed (tab navigated / extension reloaded).
       }
-      openUserPage();
-      sendResponse({ type: "OPENED_USER" } satisfies ExtensionResponse);
-      return;
-    }
-
-    if (message.type === "OPEN_LIVRO_LOGIN") {
-      openLivroLogin(ERP_BASE_URL);
-      sendResponse({ type: "OPENED_LOGIN" } satisfies ExtensionResponse);
-    }
-  })();
+    })
+    .catch((error: unknown) => {
+      const text = error instanceof Error ? error.message : "Background handler failed.";
+      try {
+        sendResponse({ type: "SESSION", ok: false, error: text } satisfies ExtensionResponse);
+      } catch {
+        // Channel already closed.
+      }
+    });
 
   return true;
 });

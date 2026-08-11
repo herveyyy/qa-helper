@@ -1,4 +1,162 @@
 (() => {
+  // src/content/constants.ts
+  var HOST_ID = "giya-extension-root";
+
+  // src/shared/allowed_origins.ts
+  function isUrlAllowed(pageUrl, patterns) {
+    if (!patterns.length)
+      return false;
+    let hostname;
+    let origin;
+    try {
+      const u = new URL(pageUrl);
+      hostname = u.hostname.toLowerCase();
+      origin = u.origin.toLowerCase();
+    } catch {
+      return false;
+    }
+    return patterns.some((raw) => matchesPattern(hostname, origin, raw.trim()));
+  }
+  function matchesPattern(hostname, origin, pattern) {
+    if (!pattern)
+      return false;
+    const lower = pattern.toLowerCase();
+    if (lower.includes("://")) {
+      try {
+        const p = new URL(lower);
+        return origin === p.origin.toLowerCase();
+      } catch {
+        return false;
+      }
+    }
+    if (lower.startsWith("*.")) {
+      const base = lower.slice(2);
+      if (!base)
+        return false;
+      return hostname === base || hostname.endsWith(`.${base}`);
+    }
+    return hostname === lower || hostname.endsWith(`.${lower}`);
+  }
+
+  // src/shared/defaults.ts
+  var DEFAULT_POSITION = "bottom-right";
+  var DEFAULT_SIDEBAR_WIDTH = 360;
+  var FAB_SIZE = 32;
+  var DOCK_WIDTH = 44;
+  var FAB_MARGIN = 16;
+  var DRAG_THRESHOLD_PX = 4;
+  var DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
+  var STORAGE_DEFAULTS = {
+    iconUrl: "",
+    position: DEFAULT_POSITION,
+    sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+    fabLeft: null,
+    fabTop: null,
+    pinned: false,
+    allowedOrigins: DEFAULT_ALLOWED_ORIGINS
+  };
+  function defaultIconUrl() {
+    return chrome.runtime.getURL("assets/giya-icon.png");
+  }
+
+  // src/content/icons.ts
+  var ICONS = {
+    back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg>`,
+    comment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>`,
+    environment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>`,
+    pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>`,
+    close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
+    login: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>`,
+    user: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
+    send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
+    search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+    spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
+  };
+
+  // src/content/widget/dom.ts
+  function escapeHtml(value) {
+    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  }
+  function loadingMarkup(message) {
+    return `
+    <div class="flex items-center gap-2 py-1 text-xs text-neutral-500" role="status" aria-live="polite" aria-busy="true">
+      ${ICONS.spinner}
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
+  }
+  function setButtonBusy(button, busy, idleHtml) {
+    if (!button)
+      return;
+    button.disabled = busy;
+    button.setAttribute("aria-busy", String(busy));
+    button.classList.toggle("opacity-70", busy);
+    button.classList.toggle("pointer-events-none", busy);
+    button.innerHTML = busy ? ICONS.spinner : idleHtml;
+  }
+  function requireEl(root, selector) {
+    const el = root.querySelector(selector);
+    if (!el)
+      throw new Error(`Missing element: ${selector}`);
+    return el;
+  }
+  async function loadConfig() {
+    const stored = await chrome.storage.sync.get(STORAGE_DEFAULTS);
+    const fabLeft = stored.fabLeft;
+    const fabTop = stored.fabTop;
+    return {
+      iconUrl: stored.iconUrl || defaultIconUrl(),
+      position: stored.position || DEFAULT_POSITION,
+      sidebarWidth: Number(stored.sidebarWidth) || DEFAULT_SIDEBAR_WIDTH,
+      fabCoords: typeof fabLeft === "number" && typeof fabTop === "number" ? { left: fabLeft, top: fabTop } : null,
+      pinned: Boolean(stored.pinned)
+    };
+  }
+  async function loadStyles(shadow) {
+    const href = chrome.runtime.getURL("content/widget.css");
+    try {
+      const res = await fetch(href);
+      const css = await res.text();
+      const style = document.createElement("style");
+      style.textContent = css;
+      shadow.appendChild(style);
+    } catch {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      shadow.appendChild(link);
+    }
+  }
+  function defaultCoords(position) {
+    const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN);
+    const maxTop = Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - FAB_MARGIN);
+    switch (position) {
+      case "bottom-left":
+        return { left: FAB_MARGIN, top: maxTop };
+      case "top-right":
+        return { left: maxLeft, top: FAB_MARGIN };
+      case "top-left":
+        return { left: FAB_MARGIN, top: FAB_MARGIN };
+      case "bottom-right":
+      default:
+        return { left: maxLeft, top: maxTop };
+    }
+  }
+  function clampCoords(coords) {
+    const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN);
+    const maxTop = Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - FAB_MARGIN);
+    return {
+      left: Math.min(maxLeft, Math.max(FAB_MARGIN, coords.left)),
+      top: Math.min(maxTop, Math.max(FAB_MARGIN, coords.top))
+    };
+  }
+  function concernNameFromLocation() {
+    const path = decodeURIComponent(location.pathname);
+    const match = path.match(/\/app\/sprint-backlogs\/(SPB-\d+)/i);
+    return match?.[1] ?? null;
+  }
+
   // src/content/auth-client.ts
   function extensionAlive() {
     try {
@@ -14,8 +172,9 @@
       return await chrome.runtime.sendMessage(message);
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
-      if (text.includes("Extension context invalidated"))
+      if (text.includes("Extension context invalidated") || text.includes("message channel closed") || text.includes("Receiving end does not exist")) {
         return null;
+      }
       throw error;
     }
   }
@@ -86,76 +245,6 @@
   async function disconnectErp() {
     await sendMessage({ type: "DISCONNECT_ERP" });
   }
-
-  // src/content/concern-client.ts
-  function extensionAlive2() {
-    try {
-      return Boolean(chrome.runtime?.id);
-    } catch {
-      return false;
-    }
-  }
-  async function sendMessage2(message) {
-    if (!extensionAlive2())
-      return null;
-    try {
-      return await chrome.runtime.sendMessage(message);
-    } catch (error) {
-      const text = error instanceof Error ? error.message : String(error);
-      if (text.includes("Extension context invalidated"))
-        return null;
-      throw error;
-    }
-  }
-  async function listConcerns() {
-    const response = await sendMessage2({ type: "LIST_CONCERNS" });
-    if (response?.type === "CONCERNS") {
-      if (response.ok)
-        return { ok: true, concerns: response.concerns };
-      return { ok: false, error: response.error };
-    }
-    return { ok: false, error: "Reload this page — Giya was updated." };
-  }
-  async function createConcern(input) {
-    const response = await sendMessage2({
-      type: "CREATE_CONCERN",
-      subject: input.subject,
-      concernType: input.type,
-      priority: input.priority,
-      description: input.description
-    });
-    if (response?.type === "CONCERN_CREATED") {
-      if (response.ok)
-        return { ok: true, concern: response.concern };
-      return { ok: false, error: response.error };
-    }
-    return { ok: false, error: "Reload this page — Giya was updated." };
-  }
-  async function listPagePins(href) {
-    const response = await sendMessage2({ type: "LIST_PAGE_PINS", href });
-    if (response?.type === "PAGE_PINS") {
-      if (response.ok)
-        return { ok: true, pins: response.pins };
-      return { ok: false, error: response.error };
-    }
-    return { ok: false, error: "Reload this page — Giya was updated." };
-  }
-  async function addConcernPin(concernName, pin) {
-    const response = await sendMessage2({
-      type: "ADD_CONCERN_PIN",
-      concernName,
-      pin
-    });
-    if (response?.type === "PIN_SAVED") {
-      if (response.ok)
-        return { ok: true, commentName: response.commentName };
-      return { ok: false, error: response.error };
-    }
-    return { ok: false, error: "Reload this page — Giya was updated." };
-  }
-
-  // src/content/constants.ts
-  var HOST_ID = "giya-extension-root";
 
   // src/content/element-picker.ts
   class ElementPicker {
@@ -299,6 +388,74 @@
     return parts.join(" > ");
   }
 
+  // src/content/concern-client.ts
+  function extensionAlive2() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
+    }
+  }
+  async function sendMessage2(message) {
+    if (!extensionAlive2())
+      return null;
+    try {
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      if (text.includes("Extension context invalidated") || text.includes("message channel closed") || text.includes("Receiving end does not exist")) {
+        return null;
+      }
+      throw error;
+    }
+  }
+  async function listConcerns() {
+    const response = await sendMessage2({ type: "LIST_CONCERNS" });
+    if (response?.type === "CONCERNS") {
+      if (response.ok)
+        return { ok: true, concerns: response.concerns };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Giya was updated." };
+  }
+  async function createConcern(input) {
+    const response = await sendMessage2({
+      type: "CREATE_CONCERN",
+      subject: input.subject,
+      concernType: input.type,
+      priority: input.priority,
+      description: input.description
+    });
+    if (response?.type === "CONCERN_CREATED") {
+      if (response.ok)
+        return { ok: true, concern: response.concern };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Giya was updated." };
+  }
+  async function listPagePins(href) {
+    const response = await sendMessage2({ type: "LIST_PAGE_PINS", href });
+    if (response?.type === "PAGE_PINS") {
+      if (response.ok)
+        return { ok: true, pins: response.pins };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Giya was updated." };
+  }
+  async function addConcernPin(concernName, pin) {
+    const response = await sendMessage2({
+      type: "ADD_CONCERN_PIN",
+      concernName,
+      pin
+    });
+    if (response?.type === "PIN_SAVED") {
+      if (response.ok)
+        return { ok: true, commentName: response.commentName };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Giya was updated." };
+  }
+
   // src/content/env-specs.ts
   function collectEnvSpecs() {
     const nav = navigator;
@@ -349,159 +506,624 @@
     ];
   }
 
-  // src/content/icons.ts
-  var ICONS = {
-    back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg>`,
-    comment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>`,
-    environment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>`,
-    pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>`,
-    close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
-    login: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>`,
-    user: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-    menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
-    send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
-    search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
-    spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
-  };
-
-  // src/shared/allowed_origins.ts
-  function isUrlAllowed(pageUrl, patterns) {
-    if (!patterns.length)
-      return false;
-    let hostname;
-    let origin;
-    try {
-      const u = new URL(pageUrl);
-      hostname = u.hostname.toLowerCase();
-      origin = u.origin.toLowerCase();
-    } catch {
-      return false;
-    }
-    return patterns.some((raw) => matchesPattern(hostname, origin, raw.trim()));
+  // src/content/widget/panels/comment.ts
+  function renderCommentPanel(els, concern, picked, host) {
+    const rect = picked.element.getBoundingClientRect();
+    host.renderDraftPin(rect);
+    els.panelTitle.textContent = "Comment";
+    els.panelBody.innerHTML = `
+      <div class="space-y-3">
+        <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Concern</p>
+          <p class="mt-0.5 font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(concern.name)}</p>
+          <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(concern.subject)}</p>
+          <button type="button" data-change-concern class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
+            Change concern
+          </button>
+        </div>
+        <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Pinned to</p>
+          <p class="mt-0.5 break-all text-xs font-medium text-neutral-900">${escapeHtml(picked.label)}</p>
+          <button type="button" data-retarget class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
+            Change element
+          </button>
+        </div>
+        <textarea
+          data-comment-input
+          rows="3"
+          placeholder="Comment here…"
+          class="w-full resize-none rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm text-neutral-800 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
+        ></textarea>
+        <div class="flex items-center justify-between gap-2">
+          <p data-comment-status class="text-xs text-neutral-500">Saves to SPB with system specs. Assignees with Giya see the pin.</p>
+          <button
+            type="button"
+            data-comment-submit
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-md transition hover:bg-sky-600"
+            aria-label="Send comment"
+          >
+            ${ICONS.send}
+          </button>
+        </div>
+      </div>
+    `;
+    const submitBtn = els.panelBody.querySelector("[data-comment-submit]");
+    const input = els.panelBody.querySelector("[data-comment-input]");
+    const status = els.panelBody.querySelector("[data-comment-status]");
+    els.panelBody.querySelector("[data-change-concern]")?.addEventListener("click", () => {
+      host.onChangeConcern();
+    });
+    els.panelBody.querySelector("[data-retarget]")?.addEventListener("click", () => {
+      host.onRetarget();
+    });
+    const sendIdle = ICONS.send;
+    submitBtn?.addEventListener("click", () => {
+      (async () => {
+        const text = input?.value.trim() ?? "";
+        if (!text) {
+          if (status)
+            status.textContent = "Write something first.";
+          return;
+        }
+        if (status)
+          status.innerHTML = loadingMarkup("Saving to Livro…");
+        setButtonBusy(submitBtn, true, sendIdle);
+        if (input)
+          input.disabled = true;
+        const result = await addConcernPin(concern.name, {
+          v: 1,
+          href: location.href,
+          selector: picked.selector,
+          label: picked.label,
+          tagName: picked.tagName,
+          text,
+          envSpecs: collectEnvSpecs()
+        });
+        if (!result.ok) {
+          setButtonBusy(submitBtn, false, sendIdle);
+          if (input)
+            input.disabled = false;
+          if (status)
+            status.textContent = result.error;
+          return;
+        }
+        if (input)
+          input.value = "";
+        if (status)
+          status.innerHTML = loadingMarkup("Refreshing pins…");
+        await host.onSaved();
+      })();
+    });
   }
-  function matchesPattern(hostname, origin, pattern) {
-    if (!pattern)
-      return false;
-    const lower = pattern.toLowerCase();
-    if (lower.includes("://")) {
-      try {
-        const p = new URL(lower);
-        return origin === p.origin.toLowerCase();
-      } catch {
-        return false;
+
+  // src/content/widget/panels/concerns.ts
+  async function renderConcernsPanel(els, host) {
+    host.markConcernsActive();
+    host.syncDockActive();
+    els.panelTitle.textContent = "Concerns";
+    els.panelBody.innerHTML = loadingMarkup("Loading concerns…");
+    host.showPanelVisual();
+    const result = await listConcerns();
+    if (!result.ok) {
+      els.panelBody.innerHTML = `
+        <div class="space-y-3">
+          <p class="text-xs leading-relaxed text-neutral-600">${escapeHtml(result.error)}</p>
+          <button
+            type="button"
+            data-retry-concerns
+            class="flex w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
+          >
+            Retry
+          </button>
+        </div>
+      `;
+      els.panelBody.querySelector("[data-retry-concerns]")?.addEventListener("click", () => {
+        renderConcernsPanel(els, host);
+      });
+      return;
+    }
+    const onForm = concernNameFromLocation();
+    if (onForm) {
+      const match = result.concerns.find((c) => c.name === onForm);
+      if (match) {
+        host.onSelectConcern(match);
+        return;
       }
     }
-    if (lower.startsWith("*.")) {
-      const base = lower.slice(2);
-      if (!base)
-        return false;
-      return hostname === base || hostname.endsWith(`.${base}`);
+    const sprintLabel = result.concerns[0]?.sprintAssign || "latest sprint";
+    const listMarkup = result.concerns.length === 0 ? `<p class="text-xs leading-relaxed text-neutral-600">
+            No open concerns yet. Create one below for QA on this page.
+          </p>` : `
+      <p class="mb-2 text-xs text-neutral-500">
+        ${escapeHtml(sprintLabel)} · current assignee. Pick a concern, then pin a UI element.
+      </p>
+      <ul class="space-y-1.5">
+        ${result.concerns.map((c) => `
+          <li>
+            <button
+              type="button"
+              data-concern="${escapeHtml(c.name)}"
+              class="w-full rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-left transition hover:bg-white"
+            >
+              <p class="font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(c.name)}</p>
+              <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(c.subject)}</p>
+              <p class="mt-1 text-[10px] text-neutral-500">${escapeHtml(c.type)} · ${escapeHtml(c.status)}${c.sprintAssign ? ` · ${escapeHtml(c.sprintAssign)}` : ""}</p>
+            </button>
+          </li>`).join("")}
+      </ul>`;
+    els.panelBody.innerHTML = `
+      <div class="mb-3 space-y-2 rounded-xl border border-black/8 bg-white/50 p-2.5">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Quick SPB</p>
+        <input
+          type="text"
+          data-create-subject
+          placeholder="Subject (e.g. QA: pin misaligned on …)"
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
+        />
+        <div class="flex gap-2">
+          <select
+            data-create-type
+            class="min-w-0 flex-1 rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
+          >
+            <option value="Bugs/Issues" selected>Bugs/Issues</option>
+            <option value="Feature Request">Feature Request</option>
+          </select>
+          <button
+            type="button"
+            data-create-spb
+            class="shrink-0 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
+          >
+            Create
+          </button>
+        </div>
+        <p data-create-status class="min-h-4 text-[10px] text-neutral-500"></p>
+      </div>
+      ${listMarkup}
+    `;
+    const subjectInput = els.panelBody.querySelector("[data-create-subject]");
+    const typeSelect = els.panelBody.querySelector("[data-create-type]");
+    const createBtn = els.panelBody.querySelector("[data-create-spb]");
+    const createStatus = els.panelBody.querySelector("[data-create-status]");
+    const runCreate = () => {
+      (async () => {
+        const subject = subjectInput?.value.trim() || "";
+        if (!subject) {
+          if (createStatus)
+            createStatus.textContent = "Enter a subject.";
+          return;
+        }
+        if (createBtn)
+          createBtn.disabled = true;
+        if (createStatus)
+          createStatus.textContent = "Creating…";
+        const created = await createConcern({
+          subject,
+          type: typeSelect?.value || "Bugs/Issues",
+          description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
+        });
+        if (!created.ok) {
+          if (createStatus)
+            createStatus.textContent = created.error;
+          if (createBtn)
+            createBtn.disabled = false;
+          return;
+        }
+        host.onSelectConcern(created.concern);
+      })();
+    };
+    createBtn?.addEventListener("click", runCreate);
+    subjectInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runCreate();
+      }
+    });
+    for (const btn of els.panelBody.querySelectorAll("[data-concern]")) {
+      btn.addEventListener("click", () => {
+        const name = btn.dataset.concern;
+        const concern = result.concerns.find((c) => c.name === name) || null;
+        if (!concern)
+          return;
+        host.onSelectConcern(concern);
+      });
     }
-    return hostname === lower || hostname.endsWith(`.${lower}`);
   }
 
-  // src/shared/defaults.ts
-  var DEFAULT_POSITION = "bottom-right";
-  var DEFAULT_SIDEBAR_WIDTH = 360;
-  var FAB_SIZE = 32;
-  var DOCK_WIDTH = 44;
-  var FAB_MARGIN = 16;
-  var DRAG_THRESHOLD_PX = 4;
-  var DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
-  var STORAGE_DEFAULTS = {
-    iconUrl: "",
-    position: DEFAULT_POSITION,
-    sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
-    fabLeft: null,
-    fabTop: null,
-    pinned: false,
-    allowedOrigins: DEFAULT_ALLOWED_ORIGINS
-  };
-  function defaultIconUrl() {
-    return chrome.runtime.getURL("assets/giya-icon.png");
+  // src/content/widget/panels/environment.ts
+  function renderEnvironmentPanel(els) {
+    els.panelTitle.textContent = "Environment";
+    const specs = collectEnvSpecs();
+    els.panelBody.innerHTML = `
+        <dl class="space-y-2.5">
+          ${specs.map((s) => `
+            <div>
+              <dt class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">${escapeHtml(s.label)}</dt>
+              <dd class="break-all text-xs leading-snug text-neutral-800">${escapeHtml(s.value)}</dd>
+            </div>`).join("")}
+        </dl>
+      `;
   }
 
-  // src/content/widget.ts
-  var iconBtnClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-700 transition hover:bg-black/8 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 data-[active=true]:bg-black data-[active=true]:text-white";
-  async function loadConfig() {
-    const stored = await chrome.storage.sync.get(STORAGE_DEFAULTS);
-    const fabLeft = stored.fabLeft;
-    const fabTop = stored.fabTop;
-    return {
-      iconUrl: stored.iconUrl || defaultIconUrl(),
-      position: stored.position || DEFAULT_POSITION,
-      sidebarWidth: Number(stored.sidebarWidth) || DEFAULT_SIDEBAR_WIDTH,
-      fabCoords: typeof fabLeft === "number" && typeof fabTop === "number" ? { left: fabLeft, top: fabTop } : null,
-      pinned: Boolean(stored.pinned)
-    };
+  // src/content/widget/panels/login.ts
+  function renderLoginPanel(els, host) {
+    els.panelTitle.textContent = "Connect Livro";
+    const otpMode = Boolean(host.otpTmpId);
+    els.panelBody.innerHTML = otpMode ? `
+      <div class="space-y-3">
+        <p class="text-xs leading-relaxed text-neutral-600">
+          Enter the verification code sent to your email (same as Giya AI / Desk OTP).
+        </p>
+        <input
+          data-otp
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          placeholder="Verification code"
+          class="w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
+        />
+        <button
+          type="button"
+          data-submit-otp
+          class="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-neutral-800"
+        >
+          ${ICONS.login}
+          Verify &amp; connect
+        </button>
+        <button type="button" data-back-login class="w-full text-xs font-medium text-sky-700 hover:text-sky-900">
+          Back to email / password
+        </button>
+        <p data-auth-status class="text-xs text-neutral-500"></p>
+      </div>` : `
+      <div class="space-y-3">
+        <p class="text-xs leading-relaxed text-neutral-600">
+          Connect Giya to Livro with your ERP login (explicit session — not silent cookie reuse).
+        </p>
+        <input
+          data-email
+          type="email"
+          autocomplete="username"
+          placeholder="Email"
+          class="w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
+        />
+        <input
+          data-password
+          type="password"
+          autocomplete="current-password"
+          placeholder="Password"
+          class="w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
+        />
+        <button
+          type="button"
+          data-submit-login
+          class="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-neutral-800"
+        >
+          ${ICONS.login}
+          Connect Livro
+        </button>
+        <button
+          type="button"
+          data-connect-desk
+          class="w-full rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
+        >
+          Use current Desk session
+        </button>
+        <p data-auth-status class="text-xs text-neutral-500"></p>
+      </div>`;
+    const status = els.panelBody.querySelector("[data-auth-status]");
+    host.focusPanelField(otpMode ? "[data-otp]" : "[data-password]");
+    els.panelBody.querySelector("[data-back-login]")?.addEventListener("click", () => {
+      host.setOtpTmpId(null);
+      host.renderAgain();
+    });
+    const submitLogin = els.panelBody.querySelector("[data-submit-login]");
+    submitLogin?.addEventListener("click", () => {
+      (async () => {
+        const email = els.panelBody.querySelector("[data-email]")?.value.trim() || "";
+        const pwd = els.panelBody.querySelector("[data-password]")?.value || "";
+        if (!email || !pwd) {
+          if (status)
+            status.textContent = "Email and password are required.";
+          return;
+        }
+        host.setPendingLoginEmail(email);
+        if (status)
+          status.innerHTML = loadingMarkup("Connecting to Livro…");
+        setButtonBusy(submitLogin, true, `${ICONS.login} Connect Livro`);
+        const result = await connectErpPassword(email, pwd);
+        setButtonBusy(submitLogin, false, `${ICONS.login} Connect Livro`);
+        if (!result.ok) {
+          if (status)
+            status.textContent = result.error;
+          return;
+        }
+        if (result.needsOtp) {
+          host.setOtpTmpId(result.tmpId);
+          host.renderAgain();
+          const nextStatus = els.panelBody.querySelector("[data-auth-status]");
+          if (nextStatus)
+            nextStatus.textContent = result.prompt;
+          return;
+        }
+        const ok = await host.refreshSession(true);
+        if (!ok) {
+          if (status)
+            status.textContent = "Connected but session not ready. Retry.";
+          return;
+        }
+        host.refreshPagePins(true);
+        host.setPanel("concerns");
+      })();
+    });
+    const submitOtp = els.panelBody.querySelector("[data-submit-otp]");
+    submitOtp?.addEventListener("click", () => {
+      (async () => {
+        const otp = els.panelBody.querySelector("[data-otp]")?.value.trim() || "";
+        if (!host.otpTmpId || !otp) {
+          if (status)
+            status.textContent = "Enter the verification code.";
+          return;
+        }
+        if (status)
+          status.innerHTML = loadingMarkup("Verifying…");
+        setButtonBusy(submitOtp, true, `${ICONS.login} Verify & connect`);
+        const result = await connectErpOtp(host.otpTmpId, otp, host.pendingLoginEmail);
+        setButtonBusy(submitOtp, false, `${ICONS.login} Verify & connect`);
+        if (!result.ok) {
+          if (status)
+            status.textContent = result.error;
+          return;
+        }
+        host.setOtpTmpId(null);
+        const ok = await host.refreshSession(true);
+        if (!ok) {
+          if (status)
+            status.textContent = "Connected but session not ready. Retry.";
+          return;
+        }
+        host.refreshPagePins(true);
+        host.setPanel("concerns");
+      })();
+    });
+    const deskBtn = els.panelBody.querySelector("[data-connect-desk]");
+    deskBtn?.addEventListener("click", () => {
+      (async () => {
+        if (status)
+          status.innerHTML = loadingMarkup("Linking Desk SID…");
+        setButtonBusy(deskBtn, true, "Use current Desk session");
+        const result = await connectErpFromDesk();
+        setButtonBusy(deskBtn, false, "Use current Desk session");
+        if (!result.ok) {
+          if (status)
+            status.textContent = result.error;
+          return;
+        }
+        const ok = await host.refreshSession(true);
+        if (!ok) {
+          if (status)
+            status.textContent = "Connected but session not ready. Retry.";
+          return;
+        }
+        host.refreshPagePins(true);
+        host.setPanel("concerns");
+      })();
+    });
   }
-  async function loadStyles(shadow) {
-    const href = chrome.runtime.getURL("content/widget.css");
-    try {
-      const res = await fetch(href);
-      const css = await res.text();
-      const style = document.createElement("style");
-      style.textContent = css;
-      shadow.appendChild(style);
-    } catch {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = href;
-      shadow.appendChild(link);
-    }
-  }
-  function defaultCoords(position) {
-    const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN);
-    const maxTop = Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - FAB_MARGIN);
-    switch (position) {
-      case "bottom-left":
-        return { left: FAB_MARGIN, top: maxTop };
-      case "top-right":
-        return { left: maxLeft, top: FAB_MARGIN };
-      case "top-left":
-        return { left: FAB_MARGIN, top: FAB_MARGIN };
-      case "bottom-right":
-      default:
-        return { left: maxLeft, top: maxTop };
-    }
-  }
-  function clampCoords(coords) {
-    const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN);
-    const maxTop = Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - FAB_MARGIN);
-    return {
-      left: Math.min(maxLeft, Math.max(FAB_MARGIN, coords.left)),
-      top: Math.min(maxTop, Math.max(FAB_MARGIN, coords.top))
-    };
-  }
-  function requireEl(root, selector) {
-    const el = root.querySelector(selector);
-    if (!el)
-      throw new Error(`Missing element: ${selector}`);
-    return el;
-  }
-  function concernNameFromLocation() {
-    const path = decodeURIComponent(location.pathname);
-    const match = path.match(/\/app\/sprint-backlogs\/(SPB-\d+)/i);
-    return match?.[1] ?? null;
-  }
-  function loadingMarkup(message) {
-    return `
-    <div class="flex items-center gap-2 py-1 text-xs text-neutral-500" role="status" aria-live="polite" aria-busy="true">
-      ${ICONS.spinner}
-      <span>${escapeHtml(message)}</span>
-    </div>
-  `;
-  }
-  function setButtonBusy(button, busy, idleHtml) {
-    if (!button)
+
+  // src/content/widget/panels/profile.ts
+  async function renderProfilePanel(els, host) {
+    els.panelTitle.textContent = "Profile";
+    els.panelBody.innerHTML = loadingMarkup("Loading profile…");
+    host.showPanelVisual();
+    const profile = await host.ensureProfile(true);
+    if (!profile) {
+      els.panelBody.innerHTML = `<p class="text-xs text-neutral-600">Could not load profile.</p>`;
       return;
-    button.disabled = busy;
-    button.setAttribute("aria-busy", String(busy));
-    button.classList.toggle("opacity-70", busy);
-    button.classList.toggle("pointer-events-none", busy);
-    button.innerHTML = busy ? ICONS.spinner : idleHtml;
+    }
+    const avatar = host.avatarUrl();
+    els.panelBody.innerHTML = `
+      <div class="flex flex-col items-center gap-3 text-center">
+        <img src="${escapeHtml(avatar)}" alt="" class="h-16 w-16 rounded-full object-cover shadow-md ring-2 ring-white" />
+        <div>
+          <p class="text-sm font-semibold text-neutral-900">${escapeHtml(profile.fullName)}</p>
+          <p class="mt-0.5 break-all text-xs text-neutral-500">${escapeHtml(profile.email)}</p>
+        </div>
+        <p class="w-full break-all rounded-xl border border-black/5 bg-white/50 px-2.5 py-2 text-left font-mono text-[10px] text-neutral-500">
+          ${escapeHtml(profile.userName)}
+        </p>
+        <button
+          type="button"
+          data-disconnect
+          class="w-full rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
+        >
+          Disconnect Livro
+        </button>
+      </div>
+    `;
+    const img = els.panelBody.querySelector("img");
+    if (img) {
+      img.onerror = () => {
+        img.src = defaultIconUrl();
+      };
+    }
+    els.panelBody.querySelector("[data-disconnect]")?.addEventListener("click", () => {
+      (async () => {
+        await disconnectErp();
+        host.onDisconnected();
+      })();
+    });
   }
 
+  // src/content/widget/pins.ts
+  function renderPinLoadingBadge(els, show) {
+    els.pinLayer.querySelector("[data-pin-loading]")?.remove();
+    if (!show)
+      return;
+    const badge = document.createElement("div");
+    badge.dataset.pinLoading = "1";
+    badge.className = "pointer-events-none fixed bottom-4 right-4 z-[5] flex items-center gap-2 rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs text-neutral-600 shadow-md backdrop-blur-md";
+    badge.setAttribute("role", "status");
+    badge.setAttribute("aria-live", "polite");
+    badge.innerHTML = `${ICONS.spinner}<span>Loading pins…</span>`;
+    els.pinLayer.appendChild(badge);
+  }
+  function clearDraftPin(els) {
+    els.pinLayer.querySelector("[data-draft-pin]")?.remove();
+  }
+  function renderDraftPin(els, rect, avatarUrl) {
+    clearDraftPin(els);
+    const wrap = document.createElement("div");
+    wrap.dataset.draftPin = "1";
+    wrap.className = "pointer-events-auto absolute";
+    wrap.style.left = `${rect.left}px`;
+    wrap.style.top = `${Math.max(8, rect.top - 8)}px`;
+    wrap.innerHTML = `
+      <div class="relative h-8 w-8">
+        <img
+          src="${escapeHtml(avatarUrl)}"
+          alt=""
+          class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-white"
+        />
+        <span class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-sky-500 text-[10px] font-bold leading-none text-white ring-2 ring-white">+</span>
+      </div>
+    `;
+    const img = wrap.querySelector("img");
+    if (img) {
+      img.onerror = () => {
+        img.src = defaultIconUrl();
+      };
+    }
+    els.pinLayer.appendChild(wrap);
+  }
+  function renderSavedPins(els, pagePins, profile, avatarUrl, onOpen) {
+    for (const node of els.pinLayer.querySelectorAll("[data-saved-pin]")) {
+      node.remove();
+    }
+    for (const item of pagePins) {
+      let target = null;
+      try {
+        target = document.querySelector(item.pin.selector);
+      } catch {
+        target = null;
+      }
+      if (!target)
+        continue;
+      const rect = target.getBoundingClientRect();
+      if (rect.width <= 0 && rect.height <= 0)
+        continue;
+      const pin = document.createElement("div");
+      pin.dataset.savedPin = item.commentName;
+      pin.className = "pointer-events-auto absolute";
+      pin.style.left = `${rect.left}px`;
+      pin.style.top = `${Math.max(8, rect.top - 8)}px`;
+      pin.title = `${item.concernName}: ${item.pin.text}`;
+      const avatar = item.commentEmail === profile?.email || item.commentEmail === profile?.userName ? avatarUrl : defaultIconUrl();
+      pin.innerHTML = `
+        <button type="button" class="relative h-8 w-8" aria-label="Open pin comment">
+          <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-sky-400" />
+        </button>
+      `;
+      const img = pin.querySelector("img");
+      if (img) {
+        img.onerror = () => {
+          img.src = defaultIconUrl();
+        };
+      }
+      pin.querySelector("button")?.addEventListener("click", () => {
+        onOpen(item);
+      });
+      els.pinLayer.appendChild(pin);
+    }
+  }
+  function showSavedPinPopout(els, item) {
+    els.panelTitle.textContent = item.concernName;
+    els.panelBody.innerHTML = `
+      <div class="space-y-2">
+        <p class="text-xs font-medium text-neutral-900">${escapeHtml(item.concernSubject)}</p>
+        <p class="text-xs text-neutral-500">${escapeHtml(item.commentBy)}</p>
+        <p class="rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${escapeHtml(item.pin.text)}</p>
+        <p class="break-all text-[10px] text-neutral-500">${escapeHtml(item.pin.label)}</p>
+      </div>
+    `;
+  }
+  async function fetchPagePins(href) {
+    const result = await listPagePins(href);
+    return result.ok ? result.pins : [];
+  }
+
+  // src/content/widget/types.ts
+  var ICON_BTN_CLASS = "grid h-8 w-8 place-items-center rounded-full text-neutral-700 transition hover:bg-black/8 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 data-[active=true]:bg-black data-[active=true]:text-white";
+
+  // src/content/widget/shell.ts
+  function widgetShellHtml() {
+    return `
+      <div data-backdrop class="pointer-events-auto fixed inset-0 bg-black/10 opacity-0 transition-opacity duration-200 ease-out invisible" aria-hidden="true"></div>
+
+      <div
+        data-highlight
+        class="pointer-events-none fixed z-1 rounded-md border-2 border-sky-400 bg-sky-400/15 opacity-0 transition-opacity duration-75"
+        hidden
+      ></div>
+
+      <div
+        data-pick-hint
+        class="pointer-events-none fixed bottom-4 left-1/2 z-5 -translate-x-1/2 rounded-full border border-white/50 bg-neutral-900/80 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-150"
+        hidden
+      >
+        Click an element to comment · Esc to cancel
+      </div>
+
+      <div data-pin-layer class="pointer-events-none fixed inset-0 z-3"></div>
+
+      <div
+        data-dock
+        class="pointer-events-auto fixed z-3 flex flex-col items-center gap-1 rounded-full border border-white/50 bg-white/55 p-1.5 shadow-lg shadow-black/10 backdrop-blur-xl transition duration-200 ease-out scale-95 opacity-0"
+        role="toolbar"
+        aria-label="Giya"
+        hidden
+      >
+        <button type="button" data-back class="${ICON_BTN_CLASS}" aria-label="Back" title="Back" data-active="false">
+          ${ICONS.back}
+        </button>
+        <button type="button" data-env class="${ICON_BTN_CLASS}" aria-label="Environment" title="Environment" data-active="false">
+          ${ICONS.environment}
+        </button>
+        <button type="button" data-user class="${ICON_BTN_CLASS}" aria-label="Profile" title="Profile" data-active="false">
+          ${ICONS.user}
+        </button>
+        <button type="button" data-pin class="${ICON_BTN_CLASS}" aria-label="Pin toolbar" title="Pin toolbar" data-active="false" aria-pressed="false">
+          ${ICONS.pin}
+        </button>
+      </div>
+
+      <section
+        data-panel
+        class="pointer-events-auto fixed z-4 w-72 max-w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
+        role="dialog"
+        aria-label="Giya panel"
+        hidden
+      >
+        <header data-panel-header class="flex cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
+          <h2 data-panel-title class="flex-1 text-xs font-semibold tracking-tight text-neutral-800"></h2>
+          <button type="button" data-close-panel class="${ICON_BTN_CLASS} cursor-pointer" aria-label="Close panel">
+            ${ICONS.close}
+          </button>
+        </header>
+        <div data-panel-body class="max-h-72 overflow-auto px-3 py-3 text-sm"></div>
+      </section>
+
+      <button
+        type="button"
+        data-fab
+        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
+        aria-label="Open Giya"
+        aria-expanded="false"
+      >
+        <img data-fab-icon class="pointer-events-none h-4 w-4 rounded-full object-cover" alt="" draggable="false" />
+      </button>
+    `;
+  }
+
+  // src/content/widget/floating-widget.ts
   class FloatingWidget {
     config;
     open = false;
@@ -539,72 +1161,7 @@
       await loadStyles(this.shadow);
       const root = document.createElement("div");
       root.className = "pointer-events-none fixed inset-0 z-[2147483646] font-sans antialiased";
-      root.innerHTML = `
-      <div data-backdrop class="pointer-events-auto fixed inset-0 bg-black/10 opacity-0 transition-opacity duration-200 ease-out invisible" aria-hidden="true"></div>
-
-      <div
-        data-highlight
-        class="pointer-events-none fixed z-1 rounded-md border-2 border-sky-400 bg-sky-400/15 opacity-0 transition-opacity duration-75"
-        hidden
-      ></div>
-
-      <div
-        data-pick-hint
-        class="pointer-events-none fixed bottom-4 left-1/2 z-5 -translate-x-1/2 rounded-full border border-white/50 bg-neutral-900/80 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-150"
-        hidden
-      >
-        Click an element to comment · Esc to cancel
-      </div>
-
-      <div data-pin-layer class="pointer-events-none fixed inset-0 z-[3]"></div>
-
-      <div
-        data-dock
-        class="pointer-events-auto fixed z-3 flex flex-col items-center gap-1 rounded-full border border-white/50 bg-white/55 p-1.5 shadow-lg shadow-black/10 backdrop-blur-xl transition duration-200 ease-out scale-95 opacity-0"
-        role="toolbar"
-        aria-label="Giya"
-        hidden
-      >
-        <button type="button" data-back class="${iconBtnClass}" aria-label="Back" title="Back" data-active="false">
-          ${ICONS.back}
-        </button>
-        <button type="button" data-env class="${iconBtnClass}" aria-label="Environment" title="Environment" data-active="false">
-          ${ICONS.environment}
-        </button>
-        <button type="button" data-user class="${iconBtnClass}" aria-label="Profile" title="Profile" data-active="false">
-          ${ICONS.user}
-        </button>
-        <button type="button" data-pin class="${iconBtnClass}" aria-label="Pin toolbar" title="Pin toolbar" data-active="false" aria-pressed="false">
-          ${ICONS.pin}
-        </button>
-      </div>
-
-      <section
-        data-panel
-        class="pointer-events-auto fixed z-4 w-72 max-w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
-        role="dialog"
-        aria-label="Giya panel"
-        hidden
-      >
-        <header data-panel-header class="flex cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
-          <h2 data-panel-title class="flex-1 text-xs font-semibold tracking-tight text-neutral-800"></h2>
-          <button type="button" data-close-panel class="${iconBtnClass} cursor-pointer" aria-label="Close panel">
-            ${ICONS.close}
-          </button>
-        </header>
-        <div data-panel-body class="max-h-72 overflow-auto px-3 py-3 text-sm"></div>
-      </section>
-
-      <button
-        type="button"
-        data-fab
-        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
-        aria-label="Open Giya"
-        aria-expanded="false"
-      >
-        <img data-fab-icon class="pointer-events-none h-4 w-4 rounded-full object-cover" alt="" draggable="false" />
-      </button>
-    `;
+      root.innerHTML = widgetShellHtml();
       this.shadow.appendChild(root);
       document.documentElement.appendChild(this.host);
       this.els = {
@@ -1291,17 +1848,7 @@
         }
         this.renderCommentPanel(this.picked);
       } else {
-        els.panelTitle.textContent = "Environment";
-        const specs = collectEnvSpecs();
-        els.panelBody.innerHTML = `
-        <dl class="space-y-2.5">
-          ${specs.map((s) => `
-            <div>
-              <dt class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">${escapeHtml(s.label)}</dt>
-              <dd class="break-all text-xs leading-snug text-neutral-800">${escapeHtml(s.value)}</dd>
-            </div>`).join("")}
-        </dl>
-      `;
+        renderEnvironmentPanel(els);
       }
       this.showPanelVisual();
     }
@@ -1329,452 +1876,74 @@
       const els = this.els;
       if (!els)
         return;
-      els.panelTitle.textContent = "Connect Livro";
-      const otpMode = Boolean(this.otpTmpId);
-      els.panelBody.innerHTML = otpMode ? `
-      <div class="space-y-3">
-        <p class="text-xs leading-relaxed text-neutral-600">
-          Enter the verification code sent to your email (same as Giya AI / Desk OTP).
-        </p>
-        <input
-          data-otp
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          placeholder="Verification code"
-          class="w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
-        />
-        <button
-          type="button"
-          data-submit-otp
-          class="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-neutral-800"
-        >
-          ${ICONS.login}
-          Verify &amp; connect
-        </button>
-        <button type="button" data-back-login class="w-full text-xs font-medium text-sky-700 hover:text-sky-900">
-          Back to email / password
-        </button>
-        <p data-auth-status class="text-xs text-neutral-500"></p>
-      </div>` : `
-      <div class="space-y-3">
-        <p class="text-xs leading-relaxed text-neutral-600">
-          Connect Giya to Livro with your ERP login (explicit session — not silent cookie reuse).
-        </p>
-        <input
-          data-email
-          type="email"
-          autocomplete="username"
-          placeholder="Email"
-          class="w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
-        />
-        <input
-          data-password
-          type="password"
-          autocomplete="current-password"
-          placeholder="Password"
-          class="w-full rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-neutral-900"
-        />
-        <button
-          type="button"
-          data-submit-login
-          class="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-neutral-800"
-        >
-          ${ICONS.login}
-          Connect Livro
-        </button>
-        <button
-          type="button"
-          data-connect-desk
-          class="w-full rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
-        >
-          Use current Desk session
-        </button>
-        <p data-auth-status class="text-xs text-neutral-500">Same flow as Giya AI ERP connection.</p>
-      </div>`;
-      const status = els.panelBody.querySelector("[data-auth-status]");
-      this.focusPanelField(otpMode ? "[data-otp]" : "[data-password]");
-      els.panelBody.querySelector("[data-back-login]")?.addEventListener("click", () => {
-        this.otpTmpId = null;
-        this.renderLoginPanel();
-      });
-      const submitLogin = els.panelBody.querySelector("[data-submit-login]");
-      submitLogin?.addEventListener("click", () => {
-        (async () => {
-          const email = els.panelBody.querySelector("[data-email]")?.value.trim() || "";
-          const pwd = els.panelBody.querySelector("[data-password]")?.value || "";
-          if (!email || !pwd) {
-            if (status)
-              status.textContent = "Email and password are required.";
-            return;
-          }
+      renderLoginPanel(els, {
+        otpTmpId: this.otpTmpId,
+        pendingLoginEmail: this.pendingLoginEmail,
+        focusPanelField: (sel) => this.focusPanelField(sel),
+        setOtpTmpId: (id) => {
+          this.otpTmpId = id;
+        },
+        setPendingLoginEmail: (email) => {
           this.pendingLoginEmail = email;
-          if (status)
-            status.innerHTML = loadingMarkup("Connecting to Livro…");
-          setButtonBusy(submitLogin, true, `${ICONS.login} Connect Livro`);
-          const result = await connectErpPassword(email, pwd);
-          setButtonBusy(submitLogin, false, `${ICONS.login} Connect Livro`);
-          if (!result.ok) {
-            if (status)
-              status.textContent = result.error;
-            return;
-          }
-          if (result.needsOtp) {
-            this.otpTmpId = result.tmpId;
-            this.renderLoginPanel();
-            const nextStatus = this.els?.panelBody.querySelector("[data-auth-status]");
-            if (nextStatus)
-              nextStatus.textContent = result.prompt;
-            return;
-          }
-          const ok = await this.refreshSession(true);
-          if (!ok) {
-            if (status)
-              status.textContent = "Connected but session not ready. Retry.";
-            return;
-          }
-          this.refreshPagePins(true);
-          this.setPanel("concerns");
-        })();
-      });
-      const submitOtp = els.panelBody.querySelector("[data-submit-otp]");
-      submitOtp?.addEventListener("click", () => {
-        (async () => {
-          const otp = els.panelBody.querySelector("[data-otp]")?.value.trim() || "";
-          if (!this.otpTmpId || !otp) {
-            if (status)
-              status.textContent = "Enter the verification code.";
-            return;
-          }
-          if (status)
-            status.innerHTML = loadingMarkup("Verifying…");
-          setButtonBusy(submitOtp, true, `${ICONS.login} Verify & connect`);
-          const result = await connectErpOtp(this.otpTmpId, otp, this.pendingLoginEmail);
-          setButtonBusy(submitOtp, false, `${ICONS.login} Verify & connect`);
-          if (!result.ok) {
-            if (status)
-              status.textContent = result.error;
-            return;
-          }
-          this.otpTmpId = null;
-          const ok = await this.refreshSession(true);
-          if (!ok) {
-            if (status)
-              status.textContent = "Connected but session not ready. Retry.";
-            return;
-          }
-          this.refreshPagePins(true);
-          this.setPanel("concerns");
-        })();
-      });
-      const deskBtn = els.panelBody.querySelector("[data-connect-desk]");
-      deskBtn?.addEventListener("click", () => {
-        (async () => {
-          if (status)
-            status.innerHTML = loadingMarkup("Linking Desk SID…");
-          setButtonBusy(deskBtn, true, "Use current Desk session");
-          const result = await connectErpFromDesk();
-          setButtonBusy(deskBtn, false, "Use current Desk session");
-          if (!result.ok) {
-            if (status)
-              status.textContent = result.error;
-            return;
-          }
-          const ok = await this.refreshSession(true);
-          if (!ok) {
-            if (status)
-              status.textContent = "Connected but session not ready. Retry.";
-            return;
-          }
-          this.refreshPagePins(true);
-          this.setPanel("concerns");
-        })();
+        },
+        refreshSession: (force) => this.refreshSession(force),
+        refreshPagePins: (force) => this.refreshPagePins(force),
+        setPanel: (panel) => this.setPanel(panel),
+        renderAgain: () => this.renderLoginPanel()
       });
     }
     async renderProfilePanel() {
       const els = this.els;
       if (!els)
         return;
-      els.panelTitle.textContent = "Profile";
-      els.panelBody.innerHTML = loadingMarkup("Loading profile…");
-      this.showPanelVisual();
-      const profile = await this.ensureProfile(true);
-      if (!profile) {
-        els.panelBody.innerHTML = `<p class="text-xs text-neutral-600">Could not load profile.</p>`;
-        return;
-      }
-      const p = profile;
-      const avatar = this.avatarUrl();
-      els.panelBody.innerHTML = `
-      <div class="flex flex-col items-center gap-3 text-center">
-        <img src="${escapeHtml(avatar)}" alt="" class="h-16 w-16 rounded-full object-cover shadow-md ring-2 ring-white" />
-        <div>
-          <p class="text-sm font-semibold text-neutral-900">${escapeHtml(p.fullName)}</p>
-          <p class="mt-0.5 break-all text-xs text-neutral-500">${escapeHtml(p.email)}</p>
-        </div>
-        <p class="w-full break-all rounded-xl border border-black/5 bg-white/50 px-2.5 py-2 text-left font-mono text-[10px] text-neutral-500">
-          ${escapeHtml(p.userName)}
-        </p>
-        <button
-          type="button"
-          data-disconnect
-          class="w-full rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
-        >
-          Disconnect Livro
-        </button>
-      </div>
-    `;
-      const img = els.panelBody.querySelector("img");
-      if (img) {
-        img.onerror = () => {
-          img.src = defaultIconUrl();
-        };
-      }
-      els.panelBody.querySelector("[data-disconnect]")?.addEventListener("click", () => {
-        (async () => {
-          await disconnectErp();
+      await renderProfilePanel(els, {
+        ensureProfile: (force) => this.ensureProfile(force),
+        avatarUrl: () => this.avatarUrl(),
+        showPanelVisual: () => this.showPanelVisual(),
+        onDisconnected: () => {
           this.session = null;
           this.profile = null;
           this.pagePins = [];
           this.renderSavedPins();
           this.showLoginPopout();
-        })();
+        }
       });
     }
     async renderConcernsPanel() {
       const els = this.els;
       if (!els)
         return;
-      this.activePanel = "concerns";
-      this.syncDockActive();
-      els.panelTitle.textContent = "Concerns";
-      els.panelBody.innerHTML = loadingMarkup("Loading concerns…");
-      this.showPanelVisual();
-      const result = await listConcerns();
-      if (!result.ok) {
-        els.panelBody.innerHTML = `
-        <div class="space-y-3">
-          <p class="text-xs leading-relaxed text-neutral-600">${escapeHtml(result.error)}</p>
-          <button
-            type="button"
-            data-retry-concerns
-            class="flex w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
-          >
-            Retry
-          </button>
-        </div>
-      `;
-        const retry = els.panelBody.querySelector("[data-retry-concerns]");
-        retry?.addEventListener("click", () => {
-          this.renderConcernsPanel();
-        });
-        return;
-      }
-      const onForm = concernNameFromLocation();
-      if (onForm) {
-        const match = result.concerns.find((c) => c.name === onForm);
-        if (match) {
-          this.selectedConcern = match;
-          this.picked = null;
-          this.startPicker();
-          return;
-        }
-      }
-      const sprintLabel = result.concerns[0]?.sprintAssign || "latest sprint";
-      const listMarkup = result.concerns.length === 0 ? `<p class="text-xs leading-relaxed text-neutral-600">
-            No open concerns yet. Create one below for QA on this page.
-          </p>` : `
-      <p class="mb-2 text-xs text-neutral-500">
-        ${escapeHtml(sprintLabel)} · current assignee. Pick a concern, then pin a UI element.
-      </p>
-      <ul class="space-y-1.5">
-        ${result.concerns.map((c) => `
-          <li>
-            <button
-              type="button"
-              data-concern="${escapeHtml(c.name)}"
-              class="w-full rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-left transition hover:bg-white"
-            >
-              <p class="font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(c.name)}</p>
-              <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(c.subject)}</p>
-              <p class="mt-1 text-[10px] text-neutral-500">${escapeHtml(c.type)} · ${escapeHtml(c.status)}${c.sprintAssign ? ` · ${escapeHtml(c.sprintAssign)}` : ""}</p>
-            </button>
-          </li>`).join("")}
-      </ul>`;
-      els.panelBody.innerHTML = `
-      <div class="mb-3 space-y-2 rounded-xl border border-black/8 bg-white/50 p-2.5">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Quick SPB</p>
-        <input
-          type="text"
-          data-create-subject
-          placeholder="Subject (e.g. QA: pin misaligned on …)"
-          class="w-full rounded-lg border border-black/10 bg-white/70 px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
-        />
-        <div class="flex gap-2">
-          <select
-            data-create-type
-            class="min-w-0 flex-1 rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
-          >
-            <option value="Bugs/Issues" selected>Bugs/Issues</option>
-            <option value="Feature Request">Feature Request</option>
-          </select>
-          <button
-            type="button"
-            data-create-spb
-            class="shrink-0 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
-          >
-            Create
-          </button>
-        </div>
-        <p data-create-status class="min-h-4 text-[10px] text-neutral-500"></p>
-      </div>
-      ${listMarkup}
-    `;
-      const subjectInput = els.panelBody.querySelector("[data-create-subject]");
-      const typeSelect = els.panelBody.querySelector("[data-create-type]");
-      const createBtn = els.panelBody.querySelector("[data-create-spb]");
-      const createStatus = els.panelBody.querySelector("[data-create-status]");
-      const runCreate = () => {
-        (async () => {
-          const subject = subjectInput?.value.trim() || "";
-          if (!subject) {
-            if (createStatus)
-              createStatus.textContent = "Enter a subject.";
-            return;
-          }
-          if (createBtn)
-            createBtn.disabled = true;
-          if (createStatus)
-            createStatus.textContent = "Creating…";
-          const created = await createConcern({
-            subject,
-            type: typeSelect?.value || "Bugs/Issues",
-            description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
-          });
-          if (!created.ok) {
-            if (createStatus)
-              createStatus.textContent = created.error;
-            if (createBtn)
-              createBtn.disabled = false;
-            return;
-          }
-          this.selectedConcern = created.concern;
-          this.picked = null;
-          this.startPicker();
-        })();
-      };
-      createBtn?.addEventListener("click", runCreate);
-      subjectInput?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          runCreate();
-        }
-      });
-      for (const btn of els.panelBody.querySelectorAll("[data-concern]")) {
-        btn.addEventListener("click", () => {
-          const name = btn.dataset.concern;
-          const concern = result.concerns.find((c) => c.name === name) || null;
-          if (!concern)
-            return;
+      await renderConcernsPanel(els, {
+        showPanelVisual: () => this.showPanelVisual(),
+        syncDockActive: () => this.syncDockActive(),
+        markConcernsActive: () => {
+          this.activePanel = "concerns";
+        },
+        onSelectConcern: (concern) => {
           this.selectedConcern = concern;
           this.picked = null;
           this.startPicker();
-        });
-      }
+        }
+      });
     }
     renderCommentPanel(picked) {
       const els = this.els;
       if (!els || !this.selectedConcern)
         return;
-      const concern = this.selectedConcern;
-      const rect = picked.element.getBoundingClientRect();
-      this.renderDraftPin(rect);
-      els.panelTitle.textContent = "Comment";
-      els.panelBody.innerHTML = `
-      <div class="space-y-3">
-        <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Concern</p>
-          <p class="mt-0.5 font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(concern.name)}</p>
-          <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(concern.subject)}</p>
-          <button type="button" data-change-concern class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
-            Change concern
-          </button>
-        </div>
-        <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Pinned to</p>
-          <p class="mt-0.5 break-all text-xs font-medium text-neutral-900">${escapeHtml(picked.label)}</p>
-          <button type="button" data-retarget class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
-            Change element
-          </button>
-        </div>
-        <textarea
-          data-comment-input
-          rows="3"
-          placeholder="Comment here…"
-          class="w-full resize-none rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm text-neutral-800 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
-        ></textarea>
-        <div class="flex items-center justify-between gap-2">
-          <p data-comment-status class="text-xs text-neutral-500">Saves to SPB with system specs. Assignees with Giya see the pin.</p>
-          <button
-            type="button"
-            data-comment-submit
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-md transition hover:bg-sky-600"
-            aria-label="Send comment"
-          >
-            ${ICONS.send}
-          </button>
-        </div>
-      </div>
-    `;
-      const submit = els.panelBody.querySelector("[data-comment-submit]");
-      const input = els.panelBody.querySelector("[data-comment-input]");
-      const status = els.panelBody.querySelector("[data-comment-status]");
-      els.panelBody.querySelector("[data-change-concern]")?.addEventListener("click", () => {
-        this.picked = null;
-        this.clearDraftPin();
-        this.renderConcernsPanel();
-      });
-      els.panelBody.querySelector("[data-retarget]")?.addEventListener("click", () => {
-        this.picked = null;
-        this.clearDraftPin();
-        this.startPicker();
-      });
-      const submitBtn = submit;
-      const sendIdle = ICONS.send;
-      submitBtn?.addEventListener("click", () => {
-        (async () => {
-          const text = input?.value.trim() ?? "";
-          if (!text) {
-            if (status)
-              status.textContent = "Write something first.";
-            return;
-          }
-          if (status)
-            status.innerHTML = loadingMarkup("Saving to Livro…");
-          setButtonBusy(submitBtn, true, sendIdle);
-          if (input)
-            input.disabled = true;
-          const result = await addConcernPin(concern.name, {
-            v: 1,
-            href: location.href,
-            selector: picked.selector,
-            label: picked.label,
-            tagName: picked.tagName,
-            text,
-            envSpecs: collectEnvSpecs()
-          });
-          if (!result.ok) {
-            setButtonBusy(submitBtn, false, sendIdle);
-            if (input)
-              input.disabled = false;
-            if (status)
-              status.textContent = result.error;
-            return;
-          }
-          if (input)
-            input.value = "";
-          if (status)
-            status.innerHTML = loadingMarkup("Refreshing pins…");
+      renderCommentPanel(els, this.selectedConcern, picked, {
+        renderDraftPin: (rect) => this.renderDraftPin(rect),
+        clearDraftPin: () => this.clearDraftPin(),
+        onChangeConcern: () => {
+          this.picked = null;
+          this.clearDraftPin();
+          this.renderConcernsPanel();
+        },
+        onRetarget: () => {
+          this.picked = null;
+          this.clearDraftPin();
+          this.startPicker();
+        },
+        onSaved: async () => {
           this.picked = null;
           this.anchorCommentToPick = false;
           this.clearDraftPin();
@@ -1782,7 +1951,7 @@
           this.hidePanelVisual();
           this.activePanel = null;
           this.syncDockActive();
-        })();
+        }
       });
     }
     async refreshPagePins(force = false) {
@@ -1802,80 +1971,32 @@
         this.renderSavedPins();
         return;
       }
+      const els = this.els;
       this.loadingPins = true;
-      this.renderPinLoadingBadge(true);
+      if (els)
+        renderPinLoadingBadge(els, true);
       const href = location.href;
       try {
-        const result = await listPagePins(href);
         this.pinsHref = href;
-        this.pagePins = result.ok ? result.pins : [];
+        this.pagePins = await fetchPagePins(href);
         this.renderSavedPins();
       } finally {
         this.loadingPins = false;
-        this.renderPinLoadingBadge(false);
+        if (els)
+          renderPinLoadingBadge(els, false);
         if (this.pinsReloadQueued || this.pinsHref !== location.href) {
           this.pinsReloadQueued = false;
           this.refreshPagePins(true);
         }
       }
     }
-    renderPinLoadingBadge(show) {
-      const els = this.els;
-      if (!els)
-        return;
-      els.pinLayer.querySelector("[data-pin-loading]")?.remove();
-      if (!show)
-        return;
-      const badge = document.createElement("div");
-      badge.dataset.pinLoading = "1";
-      badge.className = "pointer-events-none fixed bottom-4 right-4 z-[5] flex items-center gap-2 rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs text-neutral-600 shadow-md backdrop-blur-md";
-      badge.setAttribute("role", "status");
-      badge.setAttribute("aria-live", "polite");
-      badge.innerHTML = `${ICONS.spinner}<span>Loading pins…</span>`;
-      els.pinLayer.appendChild(badge);
-    }
     renderSavedPins() {
       const els = this.els;
       if (!els)
         return;
-      for (const node of els.pinLayer.querySelectorAll("[data-saved-pin]")) {
-        node.remove();
-      }
-      for (const item of this.pagePins) {
-        let target = null;
-        try {
-          target = document.querySelector(item.pin.selector);
-        } catch {
-          target = null;
-        }
-        if (!target)
-          continue;
-        const rect = target.getBoundingClientRect();
-        if (rect.width <= 0 && rect.height <= 0)
-          continue;
-        const pin = document.createElement("div");
-        pin.dataset.savedPin = item.commentName;
-        pin.className = "pointer-events-auto absolute";
-        pin.style.left = `${rect.left}px`;
-        pin.style.top = `${Math.max(8, rect.top - 8)}px`;
-        pin.title = `${item.concernName}: ${item.pin.text}`;
-        const avatar = item.commentEmail === this.profile?.email || item.commentEmail === this.profile?.userName ? this.avatarUrl() : defaultIconUrl();
-        pin.innerHTML = `
-        <button type="button" class="relative h-8 w-8" aria-label="Open pin comment">
-          <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-sky-400" />
-        </button>
-      `;
-        const img = pin.querySelector("img");
-        if (img) {
-          img.onerror = () => {
-            img.src = defaultIconUrl();
-          };
-        }
-        pin.querySelector("button")?.addEventListener("click", () => {
-          this.showSavedPinPopout(item);
-        });
-        els.pinLayer.appendChild(pin);
-      }
+      renderSavedPins(els, this.pagePins, this.profile, this.avatarUrl(), (item) => {
+        this.showSavedPinPopout(item);
+      });
     }
     showSavedPinPopout(item) {
       const els = this.els;
@@ -1884,51 +2005,20 @@
       this.activePanel = "comment";
       this.anchorCommentToPick = false;
       this.syncDockActive();
-      els.panelTitle.textContent = item.concernName;
-      els.panelBody.innerHTML = `
-      <div class="space-y-2">
-        <p class="text-xs font-medium text-neutral-900">${escapeHtml(item.concernSubject)}</p>
-        <p class="text-xs text-neutral-500">${escapeHtml(item.commentBy)}</p>
-        <p class="rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${escapeHtml(item.pin.text)}</p>
-        <p class="break-all text-[10px] text-neutral-500">${escapeHtml(item.pin.label)}</p>
-      </div>
-    `;
+      showSavedPinPopout(els, item);
       this.showPanelVisual();
     }
     renderDraftPin(rect) {
       const els = this.els;
       if (!els)
         return;
-      this.clearDraftPin();
-      const avatar = this.avatarUrl();
-      const wrap = document.createElement("div");
-      wrap.dataset.draftPin = "1";
-      wrap.className = "pointer-events-auto absolute";
-      wrap.style.left = `${rect.left}px`;
-      wrap.style.top = `${Math.max(8, rect.top - 8)}px`;
-      wrap.innerHTML = `
-      <div class="relative h-8 w-8">
-        <img
-          src="${escapeHtml(avatar)}"
-          alt=""
-          class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-white"
-        />
-        <span class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-sky-500 text-[10px] font-bold leading-none text-white ring-2 ring-white">+</span>
-      </div>
-    `;
-      const img = wrap.querySelector("img");
-      if (img) {
-        img.onerror = () => {
-          img.src = defaultIconUrl();
-        };
-      }
-      els.pinLayer.appendChild(wrap);
+      renderDraftPin(els, rect, this.avatarUrl());
     }
     clearDraftPin() {
       const els = this.els;
       if (!els)
         return;
-      els.pinLayer.querySelector("[data-draft-pin]")?.remove();
+      clearDraftPin(els);
     }
     clearCommentPin() {
       this.clearDraftPin();
@@ -2006,9 +2096,8 @@
       }
     }
   }
-  function escapeHtml(value) {
-    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-  }
+
+  // src/content/widget.ts
   async function boot() {
     try {
       if (!chrome.runtime?.id)
@@ -2045,5 +2134,5 @@
   }
 })();
 
-//# debugId=2F4D06C6C92F83A664756E2164756E21
+//# debugId=B06DCB11F11C184A64756E2164756E21
 //# sourceMappingURL=widget.js.map

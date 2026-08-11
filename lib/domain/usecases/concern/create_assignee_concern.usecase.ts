@@ -60,8 +60,10 @@ export async function createAssigneeConcern(
             module: "RND",
             sprint_assign: sprint.data,
             sprint_points: "1",
-            dev_assignee: email,
+            // Default assignees to the signed-in Giya user (QA / creator).
             current_assignee: email,
+            dev_assignee: email,
+            qa_assignee: email,
             description: input.description?.trim() || undefined,
           },
         }),
