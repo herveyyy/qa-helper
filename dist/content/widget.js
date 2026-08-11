@@ -1110,7 +1110,6 @@
         <p class="text-xs font-medium text-neutral-900">${escapeHtml(item.concernSubject)}</p>
         <p class="text-xs text-neutral-500">${escapeHtml(item.commentBy)}</p>
         <p class="rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${escapeHtml(item.pin.text)}</p>
-        <p class="break-all text-[10px] text-neutral-500">${escapeHtml(item.pin.label)}</p>
       </div>
     `;
   }
@@ -1215,6 +1214,7 @@
     panelCoords = null;
     pinsHref = null;
     pinsReloadQueued = false;
+    pinViewRect = null;
     drag = null;
     panelDrag = null;
     suppressClick = false;
@@ -1736,6 +1736,11 @@
         }
         return;
       }
+      if (this.activePanel === "pin") {
+        this.pinViewRect = null;
+        this.setPanel(null);
+        return;
+      }
       if (this.activePanel === "comment") {
         this.clearDraftPin();
         this.picked = null;
@@ -1886,6 +1891,7 @@
         this.activePanel = null;
         this.picked = null;
         this.anchorCommentToPick = false;
+        this.pinViewRect = null;
         this.syncDockActive();
         this.hidePanelVisual();
         this.clearDraftPin();
@@ -1896,6 +1902,9 @@
         this.stopPicker();
         this.clearDraftPin();
         this.anchorCommentToPick = false;
+      }
+      if (panel !== "pin") {
+        this.pinViewRect = null;
       }
       this.activePanel = panel;
       this.syncDockActive();
@@ -1919,7 +1928,7 @@
           return;
         }
         this.renderCommentPanel(this.picked);
-      } else {
+      } else if (panel === "pin") {} else {
         renderEnvironmentPanel(els);
       }
       this.showPanelVisual();
@@ -1929,19 +1938,20 @@
       if (!els)
         return;
       els.panel.hidden = false;
-      if (this.anchorCommentToPick && this.picked) {
-        this.layoutPinnedPopout(this.picked.element.getBoundingClientRect());
-      } else {
-        this.layoutChrome();
-      }
-      requestAnimationFrame(() => {
-        els.panel.classList.remove("scale-95", "opacity-0");
-        els.panel.classList.add("scale-100", "opacity-100");
-        if (this.anchorCommentToPick && this.picked) {
+      const layout = () => {
+        if (this.activePanel === "pin" && this.pinViewRect) {
+          this.layoutPinnedPopout(this.pinViewRect);
+        } else if (this.anchorCommentToPick && this.picked) {
           this.layoutPinnedPopout(this.picked.element.getBoundingClientRect());
         } else {
           this.layoutChrome();
         }
+      };
+      layout();
+      requestAnimationFrame(() => {
+        els.panel.classList.remove("scale-95", "opacity-0");
+        els.panel.classList.add("scale-100", "opacity-100");
+        layout();
       });
     }
     renderLoginPanel() {
@@ -2091,8 +2101,18 @@
       const els = this.els;
       if (!els)
         return;
-      this.activePanel = "comment";
       this.anchorCommentToPick = false;
+      this.picked = null;
+      this.clearDraftPin();
+      this.pinViewRect = null;
+      try {
+        const target = document.querySelector(item.pin.selector);
+        if (target)
+          this.pinViewRect = target.getBoundingClientRect();
+      } catch {
+        this.pinViewRect = null;
+      }
+      this.activePanel = "pin";
       this.syncDockActive();
       showSavedPinPopout(els, item);
       this.showPanelVisual();
@@ -2223,5 +2243,5 @@
   }
 })();
 
-//# debugId=64DE78776F12B47664756E2164756E21
+//# debugId=F41A7290D5AA066564756E2164756E21
 //# sourceMappingURL=widget.js.map

@@ -59,6 +59,8 @@ export class FloatingWidget {
   private panelCoords: FabCoords | null = null;
   private pinsHref: string | null = null;
   private pinsReloadQueued = false;
+  /** Anchor rect while peeking a saved pin (click pin → read → close). */
+  private pinViewRect: DOMRect | null = null;
   private drag:
     | {
         pointerId: number;
@@ -659,6 +661,13 @@ export class FloatingWidget {
       return;
     }
 
+    // Saved pin peek: close only — never dump into Concerns.
+    if (this.activePanel === "pin") {
+      this.pinViewRect = null;
+      this.setPanel(null);
+      return;
+    }
+
     if (this.activePanel === "comment") {
       this.clearDraftPin();
       this.picked = null;
@@ -820,6 +829,7 @@ export class FloatingWidget {
       this.activePanel = null;
       this.picked = null;
       this.anchorCommentToPick = false;
+      this.pinViewRect = null;
       this.syncDockActive();
       this.hidePanelVisual();
       this.clearDraftPin();
@@ -831,6 +841,9 @@ export class FloatingWidget {
       this.stopPicker();
       this.clearDraftPin();
       this.anchorCommentToPick = false;
+    }
+    if (panel !== "pin") {
+      this.pinViewRect = null;
     }
 
     this.activePanel = panel;
@@ -856,6 +869,8 @@ export class FloatingWidget {
         return;
       }
       this.renderCommentPanel(this.picked);
+    } else if (panel === "pin") {
+      // Content set by showSavedPinPopout.
     } else {
       renderEnvironmentPanel(els);
     }
@@ -867,19 +882,20 @@ export class FloatingWidget {
     const els = this.els;
     if (!els) return;
     els.panel.hidden = false;
-    if (this.anchorCommentToPick && this.picked) {
-      this.layoutPinnedPopout(this.picked.element.getBoundingClientRect());
-    } else {
-      this.layoutChrome();
-    }
-    requestAnimationFrame(() => {
-      els.panel.classList.remove("scale-95", "opacity-0");
-      els.panel.classList.add("scale-100", "opacity-100");
-      if (this.anchorCommentToPick && this.picked) {
+    const layout = () => {
+      if (this.activePanel === "pin" && this.pinViewRect) {
+        this.layoutPinnedPopout(this.pinViewRect);
+      } else if (this.anchorCommentToPick && this.picked) {
         this.layoutPinnedPopout(this.picked.element.getBoundingClientRect());
       } else {
         this.layoutChrome();
       }
+    };
+    layout();
+    requestAnimationFrame(() => {
+      els.panel.classList.remove("scale-95", "opacity-0");
+      els.panel.classList.add("scale-100", "opacity-100");
+      layout();
     });
   }
 
@@ -1032,8 +1048,18 @@ export class FloatingWidget {
     const els = this.els;
     if (!els) return;
 
-    this.activePanel = "comment";
     this.anchorCommentToPick = false;
+    this.picked = null;
+    this.clearDraftPin();
+    this.pinViewRect = null;
+    try {
+      const target = document.querySelector(item.pin.selector);
+      if (target) this.pinViewRect = target.getBoundingClientRect();
+    } catch {
+      this.pinViewRect = null;
+    }
+
+    this.activePanel = "pin";
     this.syncDockActive();
     showSavedPinPopout(els, item);
     this.showPanelVisual();

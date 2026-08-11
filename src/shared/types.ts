@@ -5,6 +5,7 @@ export type DockPanel =
   | "concerns"
   | "new-task"
   | "comment"
+  | "pin"
   | "environment"
   | "login"
   | "profile"

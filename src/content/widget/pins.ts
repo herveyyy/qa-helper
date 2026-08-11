@@ -112,6 +112,7 @@ export function renderSavedPins(
   }
 }
 
+/** Read-only pin peek: comment text + close. No selector / no Concerns handoff. */
 export function showSavedPinPopout(els: WidgetElements, item: GiyaPinComment): void {
   els.panelTitle.textContent = item.concernName;
   els.panelBody.innerHTML = `
@@ -119,7 +120,6 @@ export function showSavedPinPopout(els: WidgetElements, item: GiyaPinComment): v
         <p class="text-xs font-medium text-neutral-900">${escapeHtml(item.concernSubject)}</p>
         <p class="text-xs text-neutral-500">${escapeHtml(item.commentBy)}</p>
         <p class="rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${escapeHtml(item.pin.text)}</p>
-        <p class="break-all text-[10px] text-neutral-500">${escapeHtml(item.pin.label)}</p>
       </div>
     `;
 }
