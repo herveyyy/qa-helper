@@ -1,14 +1,116 @@
 @import "tailwindcss";
 
 @source "../content/widget.ts";
+@source "../content/widget/**/*.ts";
 @source "../content/icons.ts";
 @source "../content/env-specs.ts";
 @source "../content/element-picker.ts";
 @source "../content/auth-client.ts";
 @source "../content/concern-client.ts";
+@source "../shared/avatar.ts";
 
 /* Host reset so page styles do not leak into the shadow tree */
 :host {
   all: initial;
   font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Contrast theme: light parent page → dark Giya; dark parent → light Giya.
+ * Applied via [data-giya-theme] on the shadow root wrapper.
+ */
+[data-giya-theme="dark"] [data-dock] {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(23 23 23 / 0.72);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+[data-giya-theme="dark"] [data-panel] {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(23 23 23 / 0.82);
+  color: rgb(245 245 245);
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.5);
+}
+
+[data-giya-theme="dark"] [data-panel-header] {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+[data-giya-theme="dark"] [data-panel-title] {
+  color: rgb(245 245 245);
+}
+
+[data-giya-theme="dark"] [data-dock] button,
+[data-giya-theme="dark"] [data-close-panel] {
+  color: rgb(212 212 212);
+}
+
+[data-giya-theme="dark"] [data-dock] button:hover,
+[data-giya-theme="dark"] [data-close-panel]:hover {
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(255 255 255);
+}
+
+[data-giya-theme="dark"] [data-dock] button[data-active="true"] {
+  background: rgb(255 255 255);
+  color: rgb(23 23 23);
+}
+
+[data-giya-theme="dark"] [data-fab] {
+  border-color: rgb(255 255 255 / 0.2);
+  background: rgb(250 250 250);
+  outline-color: rgb(250 250 250);
+}
+
+[data-giya-theme="dark"] [data-backdrop] {
+  background: rgb(0 0 0 / 0.35);
+}
+
+[data-giya-theme="dark"] [data-pin-loading] {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(23 23 23 / 0.85);
+  color: rgb(212 212 212);
+}
+
+/* Soft remaps for panel content that uses light utility classes */
+[data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-9"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-8"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-7"] {
+  color: rgb(245 245 245) !important;
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-6"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-5"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-4"] {
+  color: rgb(163 163 163) !important;
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-white"] {
+  background-color: rgb(38 38 38 / 0.75) !important;
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="border-black"] {
+  border-color: rgb(255 255 255 / 0.12) !important;
+}
+
+[data-giya-theme="dark"] [data-panel-body] input,
+[data-giya-theme="dark"] [data-panel-body] textarea,
+[data-giya-theme="dark"] [data-panel-body] select {
+  color: rgb(245 245 245);
+  background-color: rgb(38 38 38 / 0.85);
+  border-color: rgb(255 255 255 / 0.14);
+}
+
+[data-giya-theme="dark"] [data-panel-body] input::placeholder,
+[data-giya-theme="dark"] [data-panel-body] textarea::placeholder {
+  color: rgb(115 115 115);
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-neutral-900"] {
+  background-color: rgb(245 245 245) !important;
+  color: rgb(23 23 23) !important;
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="hover:bg-neutral-800"]:hover {
+  background-color: rgb(229 229 229) !important;
 }

@@ -26,6 +26,7 @@ import { renderEnvironmentPanel } from "./panels/environment.ts";
 import { renderLoginPanel } from "./panels/login.ts";
 import { renderNewTaskPanel } from "./panels/new-task.ts";
 import { renderProfilePanel } from "./panels/profile.ts";
+import { watchParentTheme } from "./theme.ts";
 import {
   clearDraftPin,
   fetchPagePins,
@@ -61,6 +62,7 @@ export class FloatingWidget {
   private pinsReloadQueued = false;
   /** Anchor rect while peeking a saved pin (click pin → read → close). */
   private pinViewRect: DOMRect | null = null;
+  private stopThemeWatch: (() => void) | null = null;
   private drag:
     | {
         pointerId: number;
@@ -131,6 +133,8 @@ export class FloatingWidget {
     this.syncPinUi();
     this.bindEvents();
     this.enableKeyShield();
+    // Light parent page → dark Giya; dark parent → light Giya.
+    this.stopThemeWatch = watchParentTheme(root);
     void this.refreshSession().then((ok) => {
       // One pin load on boot — never force-loop.
       if (ok) void this.refreshPagePins(false);
