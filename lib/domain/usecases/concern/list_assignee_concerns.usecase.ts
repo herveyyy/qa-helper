@@ -2,15 +2,7 @@ import type { Concern, ConcernResult } from "../../../entities/concern.type";
 import { ERP_BASE_URL, normalizeErpBaseUrl } from "../../../entities/erpnext.type";
 import { getExtensionSession } from "../auth/get_extension_session.usecase";
 import { erpErrorMessage, erpFetch } from "../erpnext/erp_fetch.usecase";
-
-const ASSIGNEE_FIELDS = [
-  "dev_assignee",
-  "current_assignee",
-  "qa_assignee",
-  "tech_assignee",
-  "product_owner",
-  "project_manager",
-] as const;
+import { getLatestSprintAssign } from "./get_latest_sprint_assign.usecase";
 
 type SpbRow = {
   name?: string;
@@ -23,7 +15,10 @@ type SpbRow = {
   current_assignee?: string | null;
 };
 
-/** Open/active Sprint Backlogs where the logged-in user is any assignee. */
+/**
+ * Open Sprint Backlogs for the logged-in user as current_assignee
+ * on the latest Sprint (e.g. Sprint_14_R&D).
+ */
 export async function listAssigneeConcerns(
   baseUrl: string = ERP_BASE_URL
 ): Promise<ConcernResult<Concern[]>> {
@@ -34,7 +29,8 @@ export async function listAssigneeConcerns(
   if (!session.ok) return session;
 
   const email = session.data.email;
-  const orFilters = ASSIGNEE_FIELDS.map((field) => [field, "=", email]);
+  const sprint = await getLatestSprintAssign(site);
+  if (!sprint.ok) return sprint;
 
   try {
     const url = `${site}/api/method/frappe.client.get_list`;
@@ -55,10 +51,13 @@ export async function listAssigneeConcerns(
             "dev_assignee",
             "current_assignee",
           ],
-          filters: [["status", "not in", ["Completed", "Cancelled", "Closed"]]],
-          or_filters: orFilters,
+          filters: [
+            ["current_assignee", "=", email],
+            ["sprint_assign", "=", sprint.data],
+            ["status", "not in", ["Completed", "Cancelled", "Closed"]],
+          ],
           order_by: "modified desc",
-          limit_page_length: 25,
+          limit_page_length: 50,
         }),
       },
       15_000

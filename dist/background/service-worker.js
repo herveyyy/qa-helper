@@ -670,15 +670,37 @@
     }
   }
 
+  // lib/domain/usecases/concern/get_latest_sprint_assign.usecase.ts
+  async function getLatestSprintAssign(baseUrl) {
+    try {
+      const res = await erpFetch(`${baseUrl}/api/method/frappe.client.get_list`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctype: "Sprint",
+          fields: ["name"],
+          order_by: "creation desc",
+          limit_page_length: 1
+        })
+      }, 12000);
+      if (!res.ok) {
+        return { ok: false, error: `Could not load latest sprint (${res.status}).` };
+      }
+      const json = await res.json();
+      const name = Array.isArray(json.message) ? json.message[0]?.name?.trim() : "";
+      if (!name) {
+        return { ok: false, error: "No Sprint found." };
+      }
+      return { ok: true, data: name };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to resolve latest sprint.")
+      };
+    }
+  }
+
   // lib/domain/usecases/concern/list_assignee_concerns.usecase.ts
-  var ASSIGNEE_FIELDS = [
-    "dev_assignee",
-    "current_assignee",
-    "qa_assignee",
-    "tech_assignee",
-    "product_owner",
-    "project_manager"
-  ];
   async function listAssigneeConcerns(baseUrl = ERP_BASE_URL) {
     const site = normalizeErpBaseUrl(baseUrl);
     if (!site)
@@ -687,7 +709,9 @@
     if (!session.ok)
       return session;
     const email = session.data.email;
-    const orFilters = ASSIGNEE_FIELDS.map((field) => [field, "=", email]);
+    const sprint = await getLatestSprintAssign(site);
+    if (!sprint.ok)
+      return sprint;
     try {
       const url = `${site}/api/method/frappe.client.get_list`;
       const res = await erpFetch(url, {
@@ -705,10 +729,13 @@
             "dev_assignee",
             "current_assignee"
           ],
-          filters: [["status", "not in", ["Completed", "Cancelled", "Closed"]]],
-          or_filters: orFilters,
+          filters: [
+            ["current_assignee", "=", email],
+            ["sprint_assign", "=", sprint.data],
+            ["status", "not in", ["Completed", "Cancelled", "Closed"]]
+          ],
           order_by: "modified desc",
-          limit_page_length: 25
+          limit_page_length: 50
         })
       }, 15000);
       if (!res.ok) {
@@ -1102,5 +1129,5 @@
   });
 })();
 
-//# debugId=B358C621BDA58D2B64756E2164756E21
+//# debugId=E3860395D486356A64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

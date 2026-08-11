@@ -1530,12 +1530,15 @@
       if (result.concerns.length === 0) {
         els.panelBody.innerHTML = `
         <p class="text-xs leading-relaxed text-neutral-600">
-          No open concerns where you are an assignee (dev, QA, current, tech, PO, or PM).
+          No open concerns for you as <span class="font-medium">current assignee</span> on the latest sprint.
         </p>`;
         return;
       }
+      const sprintLabel = result.concerns[0]?.sprintAssign || "latest sprint";
       els.panelBody.innerHTML = `
-      <p class="mb-2 text-xs text-neutral-500">Pick a concern, then pin a UI element to comment.</p>
+      <p class="mb-2 text-xs text-neutral-500">
+        ${escapeHtml(sprintLabel)} · current assignee. Pick a concern, then pin a UI element.
+      </p>
       <ul class="space-y-1.5">
         ${result.concerns.map((c) => `
           <li>
@@ -1915,5 +1918,5 @@
   }
 })();
 
-//# debugId=0E7B5B953CA884FA64756E2164756E21
+//# debugId=6700E6722A2AAFF764756E2164756E21
 //# sourceMappingURL=widget.js.map
