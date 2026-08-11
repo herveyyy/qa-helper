@@ -17,6 +17,7 @@ export interface WidgetElements {
   btnBack: HTMLButtonElement;
   btnEnv: HTMLButtonElement;
   btnUser: HTMLButtonElement;
+  btnTheme: HTMLButtonElement;
   btnPin: HTMLButtonElement;
   btnClosePanel: HTMLButtonElement;
 }

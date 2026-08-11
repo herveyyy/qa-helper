@@ -53,6 +53,7 @@
     fabLeft: null,
     fabTop: null,
     pinned: false,
+    theme: "dark",
     allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
   function defaultIconUrl() {
@@ -72,6 +73,8 @@
     send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
     plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
     refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
+    moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
     search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
     spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
   };
@@ -107,12 +110,14 @@
     const stored = await chrome.storage.sync.get(STORAGE_DEFAULTS);
     const fabLeft = stored.fabLeft;
     const fabTop = stored.fabTop;
+    const theme = stored.theme === "light" || stored.theme === "dark" ? stored.theme : "dark";
     return {
       iconUrl: stored.iconUrl || defaultIconUrl(),
       position: stored.position || DEFAULT_POSITION,
       sidebarWidth: Number(stored.sidebarWidth) || DEFAULT_SIDEBAR_WIDTH,
       fabCoords: typeof fabLeft === "number" && typeof fabTop === "number" ? { left: fabLeft, top: fabTop } : null,
-      pinned: Boolean(stored.pinned)
+      pinned: Boolean(stored.pinned),
+      theme
     };
   }
   async function loadStyles(shadow) {
@@ -1012,123 +1017,8 @@
   }
 
   // src/content/widget/theme.ts
-  function parseCssColor(raw) {
-    const value = (raw || "").trim().toLowerCase();
-    if (!value || value === "transparent")
-      return { r: 0, g: 0, b: 0, a: 0 };
-    const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
-    if (hex) {
-      let h = hex[1];
-      if (h.length === 3) {
-        h = h.split("").map((c) => c + c).join("");
-      }
-      const n = Number.parseInt(h.slice(0, 6), 16);
-      const a = h.length === 8 ? Number.parseInt(h.slice(6, 8), 16) / 255 : 1;
-      return { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255, a };
-    }
-    const rgb = value.match(/^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/);
-    if (rgb) {
-      let a = rgb[4] == null ? 1 : Number.parseFloat(rgb[4]);
-      if (String(rgb[4] || "").includes("%"))
-        a /= 100;
-      return {
-        r: Number(rgb[1]),
-        g: Number(rgb[2]),
-        b: Number(rgb[3]),
-        a: Number.isFinite(a) ? a : 1
-      };
-    }
-    return null;
-  }
-  function luminance({ r, g, b }) {
-    const lin = [r, g, b].map((v) => {
-      const c = v / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-  }
-  function bgOf(el) {
-    if (!el)
-      return null;
-    try {
-      return parseCssColor(getComputedStyle(el).backgroundColor);
-    } catch {
-      return null;
-    }
-  }
-  function isParentPageLight() {
-    const samples = [];
-    for (const el of [document.documentElement, document.body]) {
-      const c = bgOf(el);
-      if (c && c.a >= 0.2)
-        samples.push(c);
-    }
-    try {
-      const x = Math.floor(window.innerWidth / 2);
-      const y = Math.floor(window.innerHeight / 2);
-      let el = document.elementFromPoint(x, y);
-      for (let i = 0;i < 6 && el; i++) {
-        if (el.id !== HOST_ID && !el.closest?.(`#${HOST_ID}`)) {
-          const c = bgOf(el);
-          if (c && c.a >= 0.35) {
-            samples.push(c);
-            break;
-          }
-        }
-        el = el.parentElement;
-      }
-    } catch {}
-    if (!samples.length) {
-      return !window.matchMedia("(prefers-color-scheme: dark)").matches;
-    }
-    const avg = samples.reduce((sum, c) => sum + luminance(c), 0) / samples.length;
-    return avg >= 0.55;
-  }
-  function themeForParentPage() {
-    return isParentPageLight() ? "dark" : "light";
-  }
   function applyGiyaTheme(root, theme) {
     root.dataset.giyaTheme = theme;
-  }
-  function watchParentTheme(root, onChange) {
-    let last = themeForParentPage();
-    applyGiyaTheme(root, last);
-    onChange?.(last);
-    const sync = () => {
-      const next = themeForParentPage();
-      if (next === last)
-        return;
-      last = next;
-      applyGiyaTheme(root, next);
-      onChange?.(next);
-    };
-    const debounced = (() => {
-      let t = null;
-      return () => {
-        if (t)
-          clearTimeout(t);
-        t = setTimeout(sync, 120);
-      };
-    })();
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    media.addEventListener("change", debounced);
-    const observer = new MutationObserver(debounced);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class", "style", "data-theme"]
-    });
-    if (document.body) {
-      observer.observe(document.body, {
-        attributes: true,
-        attributeFilter: ["class", "style", "data-theme"]
-      });
-    }
-    window.addEventListener("resize", debounced);
-    return () => {
-      media.removeEventListener("change", debounced);
-      observer.disconnect();
-      window.removeEventListener("resize", debounced);
-    };
   }
 
   // src/content/widget/pins.ts
@@ -1278,6 +1168,9 @@
         <button type="button" data-user class="${ICON_BTN_CLASS}" aria-label="Profile" title="Profile" data-active="false">
           ${ICONS.user}
         </button>
+        <button type="button" data-theme class="${ICON_BTN_CLASS}" aria-label="Toggle theme" title="Light mode" data-active="false" aria-pressed="true">
+          ${ICONS.sun}
+        </button>
         <button type="button" data-pin class="${ICON_BTN_CLASS}" aria-label="Pin toolbar" title="Pin toolbar" data-active="false" aria-pressed="false">
           ${ICONS.pin}
         </button>
@@ -1335,7 +1228,6 @@
     pinsHref = null;
     pinsReloadQueued = false;
     pinViewRect = null;
-    stopThemeWatch = null;
     drag = null;
     panelDrag = null;
     suppressClick = false;
@@ -1370,15 +1262,16 @@
         btnBack: requireEl(root, "[data-back]"),
         btnEnv: requireEl(root, "[data-env]"),
         btnUser: requireEl(root, "[data-user]"),
+        btnTheme: requireEl(root, "[data-theme]"),
         btnPin: requireEl(root, "[data-pin]"),
         btnClosePanel: requireEl(root, "[data-close-panel]")
       };
       this.applyIcon(this.config.iconUrl);
       this.applyFabCoords(this.config.fabCoords ? clampCoords(this.config.fabCoords) : defaultCoords(this.config.position));
       this.syncPinUi();
+      this.applyTheme(this.config.theme || "dark");
       this.bindEvents();
       this.enableKeyShield();
-      this.stopThemeWatch = watchParentTheme(root);
       this.refreshSession().then((ok) => {
         if (ok)
           this.refreshPagePins(false);
@@ -1397,6 +1290,7 @@
       els.btnBack.addEventListener("click", () => this.onBackClick());
       els.btnEnv.addEventListener("click", () => this.togglePanel("environment"));
       els.btnUser.addEventListener("click", () => this.onUserClick());
+      els.btnTheme.addEventListener("click", () => this.toggleTheme());
       els.btnPin.addEventListener("click", () => this.togglePin());
       els.btnClosePanel.addEventListener("click", () => this.onBackClick());
       els.panelHeader.addEventListener("pointerdown", this.onPanelPointerDown);
@@ -2302,6 +2196,30 @@
       els.btnPin.title = this.config.pinned ? "Unpin toolbar" : "Pin toolbar";
       els.btnPin.setAttribute("aria-label", this.config.pinned ? "Unpin toolbar" : "Pin toolbar");
     }
+    toggleTheme() {
+      const next = this.config.theme === "dark" ? "light" : "dark";
+      this.applyTheme(next);
+      chrome.storage.sync.set({ theme: next });
+    }
+    applyTheme(theme) {
+      const next = theme === "light" ? "light" : "dark";
+      this.config.theme = next;
+      const els = this.els;
+      if (els)
+        applyGiyaTheme(els.root, next);
+      this.syncThemeUi();
+    }
+    syncThemeUi() {
+      const els = this.els;
+      if (!els)
+        return;
+      const dark = this.config.theme === "dark";
+      els.btnTheme.innerHTML = dark ? ICONS.sun : ICONS.moon;
+      els.btnTheme.title = dark ? "Light mode" : "Dark mode";
+      els.btnTheme.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+      els.btnTheme.setAttribute("aria-pressed", String(dark));
+      els.btnTheme.dataset.active = "false";
+    }
     updateFromStorage(changes) {
       if (changes.iconUrl) {
         this.applyIcon(changes.iconUrl.newValue || defaultIconUrl());
@@ -2311,6 +2229,10 @@
       }
       if (changes.sidebarWidth) {
         this.applySidebarWidth(Number(changes.sidebarWidth.newValue));
+      }
+      if (changes.theme) {
+        const value = changes.theme.newValue;
+        this.applyTheme(value === "light" ? "light" : "dark");
       }
       if (changes.pinned) {
         this.config.pinned = Boolean(changes.pinned.newValue);
@@ -2365,5 +2287,5 @@
   }
 })();
 
-//# debugId=7D6042B130780BDE64756E2164756E21
+//# debugId=EBF123361F6E1ED864756E2164756E21
 //# sourceMappingURL=widget.js.map

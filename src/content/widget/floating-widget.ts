@@ -4,6 +4,7 @@ import type { UserProfile } from "../../../lib/entities/user.type";
 import { fetchSession, fetchUserProfile, peekSid } from "../auth-client.ts";
 import { HOST_ID } from "../constants.ts";
 import { ElementPicker, type PickedElement } from "../element-picker.ts";
+import { ICONS } from "../icons.ts";
 import { avatarFallbackUrl } from "../../shared/avatar.ts";
 import {
   DEFAULT_POSITION,
@@ -13,7 +14,13 @@ import {
   FAB_SIZE,
   defaultIconUrl,
 } from "../../shared/defaults.ts";
-import type { DockPanel, FabCoords, FabPosition, WidgetConfig } from "../../shared/types.ts";
+import type {
+  DockPanel,
+  FabCoords,
+  FabPosition,
+  GiyaTheme,
+  WidgetConfig,
+} from "../../shared/types.ts";
 import {
   clampCoords,
   defaultCoords,
@@ -26,7 +33,7 @@ import { renderEnvironmentPanel } from "./panels/environment.ts";
 import { renderLoginPanel } from "./panels/login.ts";
 import { renderNewTaskPanel } from "./panels/new-task.ts";
 import { renderProfilePanel } from "./panels/profile.ts";
-import { watchParentTheme } from "./theme.ts";
+import { applyGiyaTheme } from "./theme.ts";
 import {
   clearDraftPin,
   fetchPagePins,
@@ -62,26 +69,25 @@ export class FloatingWidget {
   private pinsReloadQueued = false;
   /** Anchor rect while peeking a saved pin (click pin → read → close). */
   private pinViewRect: DOMRect | null = null;
-  private stopThemeWatch: (() => void) | null = null;
   private drag:
     | {
-        pointerId: number;
-        startX: number;
-        startY: number;
-        originLeft: number;
-        originTop: number;
-        moved: boolean;
-      }
+      pointerId: number;
+      startX: number;
+      startY: number;
+      originLeft: number;
+      originTop: number;
+      moved: boolean;
+    }
     | null = null;
   private panelDrag:
     | {
-        pointerId: number;
-        startX: number;
-        startY: number;
-        originLeft: number;
-        originTop: number;
-        moved: boolean;
-      }
+      pointerId: number;
+      startX: number;
+      startY: number;
+      originLeft: number;
+      originTop: number;
+      moved: boolean;
+    }
     | null = null;
   private suppressClick = false;
 
@@ -120,6 +126,7 @@ export class FloatingWidget {
       btnBack: requireEl<HTMLButtonElement>(root, "[data-back]"),
       btnEnv: requireEl<HTMLButtonElement>(root, "[data-env]"),
       btnUser: requireEl<HTMLButtonElement>(root, "[data-user]"),
+      btnTheme: requireEl<HTMLButtonElement>(root, "[data-theme]"),
       btnPin: requireEl<HTMLButtonElement>(root, "[data-pin]"),
       btnClosePanel: requireEl<HTMLButtonElement>(root, "[data-close-panel]"),
     };
@@ -131,10 +138,9 @@ export class FloatingWidget {
         : defaultCoords(this.config.position)
     );
     this.syncPinUi();
+    this.applyTheme(this.config.theme || "dark");
     this.bindEvents();
     this.enableKeyShield();
-    // Light parent page → dark Giya; dark parent → light Giya.
-    this.stopThemeWatch = watchParentTheme(root);
     void this.refreshSession().then((ok) => {
       // One pin load on boot — never force-loop.
       if (ok) void this.refreshPagePins(false);
@@ -154,6 +160,7 @@ export class FloatingWidget {
     els.btnBack.addEventListener("click", () => this.onBackClick());
     els.btnEnv.addEventListener("click", () => this.togglePanel("environment"));
     els.btnUser.addEventListener("click", () => this.onUserClick());
+    els.btnTheme.addEventListener("click", () => this.toggleTheme());
     els.btnPin.addEventListener("click", () => this.togglePin());
     els.btnClosePanel.addEventListener("click", () => this.onBackClick());
     els.panelHeader.addEventListener("pointerdown", this.onPanelPointerDown);
@@ -816,9 +823,9 @@ export class FloatingWidget {
     if (!els) return;
     els.btnBack.dataset.active = String(
       this.activePanel === "comment" ||
-        this.activePanel === "concerns" ||
-        this.activePanel === "new-task" ||
-        this.picker.isActive
+      this.activePanel === "concerns" ||
+      this.activePanel === "new-task" ||
+      this.picker.isActive
     );
     els.btnEnv.dataset.active = String(this.activePanel === "environment");
     els.btnUser.dataset.active = String(this.activePanel === "profile");
@@ -1140,6 +1147,35 @@ export class FloatingWidget {
     );
   }
 
+  private toggleTheme(): void {
+    const next: GiyaTheme = this.config.theme === "dark" ? "light" : "dark";
+    this.applyTheme(next);
+    void chrome.storage.sync.set({ theme: next });
+  }
+
+  private applyTheme(theme: GiyaTheme): void {
+    const next: GiyaTheme = theme === "light" ? "light" : "dark";
+    this.config.theme = next;
+    const els = this.els;
+    if (els) applyGiyaTheme(els.root, next);
+    this.syncThemeUi();
+  }
+
+  private syncThemeUi(): void {
+    const els = this.els;
+    if (!els) return;
+    const dark = this.config.theme === "dark";
+    // Icon shows the mode you'll switch TO.
+    els.btnTheme.innerHTML = dark ? ICONS.sun : ICONS.moon;
+    els.btnTheme.title = dark ? "Light mode" : "Dark mode";
+    els.btnTheme.setAttribute(
+      "aria-label",
+      dark ? "Switch to light mode" : "Switch to dark mode"
+    );
+    els.btnTheme.setAttribute("aria-pressed", String(dark));
+    els.btnTheme.dataset.active = "false";
+  }
+
   updateFromStorage(changes: { [key: string]: chrome.storage.StorageChange }): void {
     if (changes.iconUrl) {
       this.applyIcon(changes.iconUrl.newValue || defaultIconUrl());
@@ -1149,6 +1185,10 @@ export class FloatingWidget {
     }
     if (changes.sidebarWidth) {
       this.applySidebarWidth(Number(changes.sidebarWidth.newValue));
+    }
+    if (changes.theme) {
+      const value = changes.theme.newValue;
+      this.applyTheme(value === "light" ? "light" : "dark");
     }
     if (changes.pinned) {
       this.config.pinned = Boolean(changes.pinned.newValue);

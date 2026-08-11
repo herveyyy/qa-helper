@@ -1,5 +1,8 @@
 export type FabPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
+/** Giya chrome theme (independent of host page). Default: dark. */
+export type GiyaTheme = "light" | "dark";
+
 /** In-page popout views (never navigate to extension tabs). */
 export type DockPanel =
   | "concerns"
@@ -22,6 +25,7 @@ export interface WidgetConfig {
   sidebarWidth: number;
   fabCoords: FabCoords | null;
   pinned: boolean;
+  theme: GiyaTheme;
 }
 
 export interface StoredSettings {
@@ -31,6 +35,7 @@ export interface StoredSettings {
   fabLeft: number | null;
   fabTop: number | null;
   pinned: boolean;
+  theme: GiyaTheme;
   /** Host/origin patterns where the widget may mount (e.g. `wela.dev`, `*.livro.systems`). */
   allowedOrigins: string[];
 }

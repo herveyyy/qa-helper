@@ -7,7 +7,7 @@ import {
   STORAGE_DEFAULTS,
   defaultIconUrl,
 } from "../../shared/defaults.ts";
-import type { FabCoords, FabPosition, WidgetConfig } from "../../shared/types.ts";
+import type { FabCoords, FabPosition, GiyaTheme, WidgetConfig } from "../../shared/types.ts";
 
 export function escapeHtml(value: string): string {
   return value
@@ -50,6 +50,11 @@ export async function loadConfig(): Promise<WidgetConfig> {
   const fabLeft = stored.fabLeft;
   const fabTop = stored.fabTop;
 
+  const theme =
+    stored.theme === "light" || stored.theme === "dark"
+      ? (stored.theme as GiyaTheme)
+      : "dark";
+
   return {
     iconUrl: stored.iconUrl || defaultIconUrl(),
     position: (stored.position as FabPosition) || DEFAULT_POSITION,
@@ -59,6 +64,7 @@ export async function loadConfig(): Promise<WidgetConfig> {
         ? { left: fabLeft, top: fabTop }
         : null,
     pinned: Boolean(stored.pinned),
+    theme,
   };
 }
 

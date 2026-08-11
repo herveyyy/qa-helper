@@ -38,6 +38,9 @@ export function widgetShellHtml(): string {
         <button type="button" data-user class="${ICON_BTN_CLASS}" aria-label="Profile" title="Profile" data-active="false">
           ${ICONS.user}
         </button>
+        <button type="button" data-theme class="${ICON_BTN_CLASS}" aria-label="Toggle theme" title="Light mode" data-active="false" aria-pressed="true">
+          ${ICONS.sun}
+        </button>
         <button type="button" data-pin class="${ICON_BTN_CLASS}" aria-label="Pin toolbar" title="Pin toolbar" data-active="false" aria-pressed="false">
           ${ICONS.pin}
         </button>

@@ -1172,6 +1172,7 @@
     fabLeft: null,
     fabTop: null,
     pinned: false,
+    theme: "dark",
     allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
 
@@ -1325,5 +1326,5 @@
   });
 })();
 
-//# debugId=F795A5BA50F3681B64756E2164756E21
+//# debugId=EF366353C9CC2B1364756E2164756E21
 //# sourceMappingURL=service-worker.js.map

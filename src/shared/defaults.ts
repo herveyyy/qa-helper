@@ -16,6 +16,7 @@ export const STORAGE_DEFAULTS: StoredSettings = {
   fabLeft: null,
   fabTop: null,
   pinned: false,
+  theme: "dark",
   allowedOrigins: DEFAULT_ALLOWED_ORIGINS,
 };
 
