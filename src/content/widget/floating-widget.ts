@@ -165,7 +165,8 @@ export class FloatingWidget {
       chrome.runtime.onMessage.addListener((message: { type?: string }) => {
         if (!chrome.runtime?.id) return undefined;
         if (message?.type === "AUTH_CHANGED") {
-          void this.refreshSession(true).then(async (ok) => {
+          // Cookie-based session — no need to force network revalidate.
+          void this.refreshSession(false).then(async (ok) => {
             if (ok) {
               void this.refreshPagePins(true);
               if (this.activePanel === "login") {

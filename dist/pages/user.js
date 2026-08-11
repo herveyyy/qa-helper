@@ -1,4 +1,31 @@
 (() => {
+  // src/shared/runtime_message.ts
+  function extensionAlive() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
+    }
+  }
+  function sendRuntimeMessage(message) {
+    if (!extensionAlive())
+      return Promise.resolve(null);
+    return new Promise((resolve) => {
+      try {
+        const runtime = chrome.runtime;
+        runtime.sendMessage(message, (response) => {
+          if (runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response ?? null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
   // src/pages/user.ts
   var loadingEl = document.getElementById("loading");
   var errorEl = document.getElementById("error");
@@ -16,9 +43,6 @@
   var FALLBACK_AVATAR = chrome.runtime.getURL("assets/giya-icon.png");
   function setStatus(message) {
     statusEl.textContent = message;
-  }
-  async function send(message) {
-    return await chrome.runtime.sendMessage(message);
   }
   function showLoading() {
     loadingEl.classList.remove("hidden");
@@ -49,11 +73,9 @@
   async function loadProfile() {
     showLoading();
     setStatus("Fetching Livro user…");
-    const response = await send({
-      type: "GET_USER_PROFILE"
-    });
-    if (!response.ok) {
-      showError(response.error || "Could not load profile.");
+    const response = await sendRuntimeMessage({ type: "GET_USER_PROFILE" });
+    if (response?.type !== "USER_PROFILE" || !response.ok) {
+      showError(response?.type === "USER_PROFILE" ? response.error : "Could not load profile.");
       setStatus("Sign in with Livro, then refresh.");
       return;
     }
@@ -67,7 +89,7 @@
     window.close();
   });
   goLoginBtn.addEventListener("click", () => {
-    send({ type: "OPEN_LOGIN_PAGE" });
+    sendRuntimeMessage({ type: "OPEN_LOGIN_PAGE" });
   });
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === "AUTH_CHANGED") {
@@ -78,5 +100,5 @@
   loadProfile();
 })();
 
-//# debugId=AC18ACDE7B4FAB9E64756E2164756E21
+//# debugId=A81E247595ED4F3F64756E2164756E21
 //# sourceMappingURL=user.js.map

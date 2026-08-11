@@ -1,6 +1,6 @@
 import type { AuthResult } from "../../../entities/auth.type";
 import { normalizeErpBaseUrl } from "../../../entities/erpnext.type";
-import { erpFetch } from "./erp_fetch.usecase";
+import { erpErrorMessage, erpFetch } from "./erp_fetch.usecase";
 
 /** Resolve the logged-in ERP user from the browser sid cookie (giya-ai pattern). */
 export async function getErpLoggedUser(
@@ -25,12 +25,9 @@ export async function getErpLoggedUser(
 
     return { ok: true, data: { email } };
   } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      return { ok: false, error: `ERP at ${site} timed out while checking sid.` };
-    }
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "ERPNext session check failed.",
+      error: erpErrorMessage(error, "ERPNext session check failed."),
     };
   }
 }

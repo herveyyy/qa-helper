@@ -1,11 +1,10 @@
 import type { AuthResult, ExtensionSession } from "../../../entities/auth.type";
 import { ERP_BASE_URL, normalizeErpBaseUrl } from "../../../entities/erpnext.type";
-import { getErpLoggedUser } from "../erpnext/get_logged_user.usecase";
 import { ensureErpSidCookie } from "./ensure_erp_sid_cookie.usecase";
 import { getGiyaConnection } from "./giya_erp_connection.usecase";
 import { readErpIdentityCookies } from "./read_erp_identity_cookies.usecase";
 
-const CACHE_TTL_MS = 45_000;
+const CACHE_TTL_MS = 60_000;
 
 type SessionCache = {
   at: number;
@@ -13,6 +12,7 @@ type SessionCache = {
 };
 
 let memoryCache: SessionCache | null = null;
+let inflight: Promise<AuthResult<ExtensionSession>> | null = null;
 
 /** Fast path: cookie presence only (no network). */
 export async function hasErpSidCookie(
@@ -23,8 +23,9 @@ export async function hasErpSidCookie(
 }
 
 /**
- * Giya session = explicit Connect (chrome.storage) + Livro `sid` cookie.
- * Matches giya-ai: do not treat a stray Desk cookie as an extension login.
+ * Giya session = explicit Connect + Livro SID cookie (CSRF optional).
+ * No frappe.auth.get_logged_user — that method is not whitelisted for Guest/
+ * cross-origin and was causing lag + permission errors.
  */
 export async function getExtensionSession(
   baseUrl: string = ERP_BASE_URL,
@@ -41,6 +42,17 @@ export async function getExtensionSession(
     return memoryCache.result;
   }
 
+  if (inflight) return inflight;
+
+  inflight = resolveSession(site).finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
+
+async function resolveSession(
+  site: string
+): Promise<AuthResult<ExtensionSession>> {
   try {
     const connection = await getGiyaConnection();
     if (!connection) {
@@ -52,11 +64,16 @@ export async function getExtensionSession(
       return result;
     }
 
-    const origin = normalizeErpBaseUrl(connection.baseUrl) || site;
+    // Always Livro ERP — never the host page (e.g. *.wela.dev).
+    const origin = ERP_BASE_URL;
 
-    // Prefer cookie jar; re-hydrate from stored Connect SID when missing.
     let identity = await readErpIdentityCookies(origin);
-    if (!identity?.sid && connection.sid) {
+    const cookieMatches =
+      Boolean(identity?.sid && connection.sid) &&
+      identity!.sid === connection.sid;
+
+    // Restore Connect SID only when jar is empty or mismatched (no rewrite storm).
+    if (!cookieMatches) {
       await ensureErpSidCookie(origin, connection.sid, {
         userId: connection.email,
         fullName: connection.fullName,
@@ -64,8 +81,8 @@ export async function getExtensionSession(
       identity = await readErpIdentityCookies(origin);
     }
 
-    const sid = identity?.sid || connection.sid;
-    if (!sid) {
+    const sid = identity?.sid || "";
+    if (!sid || sid === "Guest") {
       const result: AuthResult<ExtensionSession> = {
         ok: false,
         error: "Login required.",
@@ -74,67 +91,35 @@ export async function getExtensionSession(
       return result;
     }
 
-    if (identity?.userId) {
+    // Prefer cookie user_id; fall back to Connect email.
+    const email =
+      (identity?.userId && identity.userId !== "Guest"
+        ? identity.userId
+        : connection.email) || "";
+    if (!email || email === "Guest") {
       const result: AuthResult<ExtensionSession> = {
-        ok: true,
-        data: {
-          email: identity.userId,
-          sid,
-          baseUrl: origin,
-        },
+        ok: false,
+        error: "Connect Livro in Giya first.",
       };
       memoryCache = { at: Date.now(), result };
       return result;
     }
 
-    const logged = await getErpLoggedUser(origin, sid);
-    if (logged.ok) {
-      const result: AuthResult<ExtensionSession> = {
-        ok: true,
-        data: {
-          email: logged.data.email,
-          sid,
-          baseUrl: origin,
-        },
-      };
-      memoryCache = { at: Date.now(), result };
-      return result;
-    }
-
-    if (logged.error.includes("timed out")) {
-      const result: AuthResult<ExtensionSession> = {
-        ok: true,
-        data: {
-          email: connection.email,
-          sid,
-          baseUrl: origin,
-        },
-      };
-      memoryCache = { at: Date.now(), result };
-      return result;
-    }
-
-    // Stored Connect SID is authoritative when cookie/network checks flake.
-    if (connection.sid) {
-      const result: AuthResult<ExtensionSession> = {
-        ok: true,
-        data: {
-          email: connection.email,
-          sid: connection.sid,
-          baseUrl: origin,
-        },
-      };
-      memoryCache = { at: Date.now(), result };
-      return result;
-    }
-
-    const result: AuthResult<ExtensionSession> = logged;
+    const result: AuthResult<ExtensionSession> = {
+      ok: true,
+      data: {
+        email,
+        sid: connection.sid,
+        baseUrl: origin,
+      },
+    };
     memoryCache = { at: Date.now(), result };
     return result;
   } catch (error) {
     const result: AuthResult<ExtensionSession> = {
       ok: false,
-      error: error instanceof Error ? error.message : "Failed to read ERP session.",
+      error:
+        error instanceof Error ? error.message : "Failed to read ERP session.",
     };
     memoryCache = { at: Date.now(), result };
     return result;
@@ -143,4 +128,5 @@ export async function getExtensionSession(
 
 export function clearSessionCache(): void {
   memoryCache = null;
+  inflight = null;
 }

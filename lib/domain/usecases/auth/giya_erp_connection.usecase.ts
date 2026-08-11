@@ -4,7 +4,6 @@ import {
   type GiyaErpConnection,
 } from "../../../entities/giya_connection.type";
 import { ERP_BASE_URL, normalizeErpBaseUrl } from "../../../entities/erpnext.type";
-import { getErpLoggedUser } from "../erpnext/get_logged_user.usecase";
 import { loginLivroErp, type LivroLoginInput } from "../erpnext/login_livro.usecase";
 import { ensureErpSidCookie } from "./ensure_erp_sid_cookie.usecase";
 import { clearSessionCache } from "./get_extension_session.usecase";
@@ -71,16 +70,8 @@ export async function connectLivroErp(
     return { ok: false, error: "Login failed — no SID returned." };
   }
 
-  // Cookie must be in the jar before get_logged_user (erpFetch uses credentials).
-  await ensureErpSidCookie(success.baseUrl, success.sid, {
-    userId: success.email,
-    fullName: success.fullName,
-  });
-
-  const logged = await getErpLoggedUser(success.baseUrl, success.sid);
-  const email = logged.ok ? logged.data.email : success.email;
   const connection = await saveConnection(
-    email,
+    success.email,
     success.fullName,
     success.baseUrl,
     success.sid
@@ -89,8 +80,8 @@ export async function connectLivroErp(
 }
 
 /**
- * Explicit “use current Desk session” — still requires a click (not silent).
- * Validates sid via get_logged_user then marks Giya connected.
+ * Explicit “use current Desk session” — click required (not silent).
+ * Trusts Livro sid + user_id / csrf cookies (no get_logged_user).
  */
 export async function connectWithDeskSid(
   baseUrl: string = ERP_BASE_URL
@@ -103,14 +94,11 @@ export async function connectWithDeskSid(
     return { ok: false, error: "No Livro SID in this browser. Sign in below." };
   }
 
-  const logged = await getErpLoggedUser(site, identity.sid);
-  const email = logged.ok
-    ? logged.data.email
-    : identity.userId || "";
+  const email = identity.userId || "";
   if (!email || email === "Guest") {
     return {
       ok: false,
-      error: logged.ok ? "Session expired." : logged.error,
+      error: "Livro cookies incomplete (need sid + user_id). Open Desk and retry.",
     };
   }
 

@@ -27,7 +27,19 @@ async function setCookie(
   }
 }
 
-/** Write Livro `sid` (+ identity hints) so host_permissions fetch can use it. */
+async function readCookie(url: string, name: string): Promise<string> {
+  try {
+    const cookie = await chrome.cookies.get({ url, name });
+    return cookie?.value?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Write Livro `sid` (+ identity hints) only when missing/mismatched.
+ * Always rewriting sid triggers cookies.onChanged → AUTH_CHANGED storms.
+ */
 export async function ensureErpSidCookie(
   baseUrl: string,
   sid: string,
@@ -37,21 +49,37 @@ export async function ensureErpSidCookie(
   const value = sid.trim();
   if (!site || !value || value === "Guest") return false;
 
-  let ok = await setCookie(site, "sid", value, true);
-  if (!ok) ok = await setCookie(site, "sid", value, false);
+  const currentSid = await readCookie(site, "sid");
+  let wrote = false;
 
-  if (identity.userId?.trim()) {
-    await setCookie(site, "user_id", identity.userId.trim(), false);
-  }
-  if (identity.fullName?.trim()) {
-    await setCookie(site, "full_name", identity.fullName.trim(), false);
+  if (currentSid !== value) {
+    let ok = await setCookie(site, "sid", value, true);
+    if (!ok) ok = await setCookie(site, "sid", value, false);
+    wrote = ok;
   }
 
-  try {
-    const check = await chrome.cookies.get({ url: site, name: "sid" });
-    const stored = check?.value?.trim() ?? "";
+  const wantUser = identity.userId?.trim() || "";
+  if (wantUser) {
+    const currentUser = await readCookie(site, "user_id");
+    if (currentUser !== wantUser) {
+      await setCookie(site, "user_id", wantUser, false);
+      wrote = true;
+    }
+  }
+
+  const wantName = identity.fullName?.trim() || "";
+  if (wantName) {
+    const currentName = await readCookie(site, "full_name");
+    if (currentName !== wantName) {
+      await setCookie(site, "full_name", wantName, false);
+      wrote = true;
+    }
+  }
+
+  if (currentSid === value || wrote) {
+    const stored = await readCookie(site, "sid");
     return Boolean(stored && stored !== "Guest");
-  } catch {
-    return ok;
   }
+
+  return false;
 }

@@ -158,7 +158,7 @@
     return match?.[1] ?? null;
   }
 
-  // src/content/auth-client.ts
+  // src/shared/runtime_message.ts
   function extensionAlive() {
     try {
       return Boolean(chrome.runtime?.id);
@@ -166,25 +166,32 @@
       return false;
     }
   }
-  async function sendMessage(message) {
+  function sendRuntimeMessage(message) {
     if (!extensionAlive())
-      return null;
-    try {
-      return await chrome.runtime.sendMessage(message);
-    } catch (error) {
-      const text = error instanceof Error ? error.message : String(error);
-      if (text.includes("Extension context invalidated") || text.includes("message channel closed") || text.includes("Receiving end does not exist")) {
-        return null;
+      return Promise.resolve(null);
+    return new Promise((resolve) => {
+      try {
+        const runtime = chrome.runtime;
+        runtime.sendMessage(message, (response) => {
+          if (runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response ?? null);
+        });
+      } catch {
+        resolve(null);
       }
-      throw error;
-    }
+    });
   }
+
+  // src/content/auth-client.ts
   async function peekSid() {
-    const response = await sendMessage({ type: "PEEK_SID" });
+    const response = await sendRuntimeMessage({ type: "PEEK_SID" });
     return response?.type === "PEEK_SID" ? response.hasSid : false;
   }
   async function fetchSession(force = false) {
-    const response = await sendMessage({ type: "GET_SESSION", force });
+    const response = await sendRuntimeMessage({ type: "GET_SESSION", force });
     if (response?.type === "SESSION") {
       if (response.ok)
         return { ok: true, session: response.session };
@@ -193,7 +200,7 @@
     return { ok: false, error: "Reload this page — Giya was updated." };
   }
   async function fetchUserProfile() {
-    const response = await sendMessage({ type: "GET_USER_PROFILE" });
+    const response = await sendRuntimeMessage({ type: "GET_USER_PROFILE" });
     if (response?.type === "USER_PROFILE") {
       if (response.ok)
         return { ok: true, profile: response.profile };
@@ -202,7 +209,7 @@
     return { ok: false, error: "Profile unavailable." };
   }
   async function connectErpPassword(usr, pwd) {
-    const response = await sendMessage({ type: "CONNECT_ERP", usr, pwd });
+    const response = await sendRuntimeMessage({ type: "CONNECT_ERP", usr, pwd });
     if (response?.type !== "CONNECT_ERP") {
       return { ok: false, error: "Reload this page — Giya was updated." };
     }
@@ -220,7 +227,12 @@
     return { ok: true, connection: response.connection };
   }
   async function connectErpOtp(tmpId, otp, usr) {
-    const response = await sendMessage({ type: "CONNECT_ERP", tmpId, otp, usr });
+    const response = await sendRuntimeMessage({
+      type: "CONNECT_ERP",
+      tmpId,
+      otp,
+      usr
+    });
     if (response?.type !== "CONNECT_ERP") {
       return { ok: false, error: "Reload this page — Giya was updated." };
     }
@@ -232,7 +244,7 @@
     return { ok: true, connection: response.connection };
   }
   async function connectErpFromDesk() {
-    const response = await sendMessage({ type: "CONNECT_ERP_DESK" });
+    const response = await sendRuntimeMessage({ type: "CONNECT_ERP_DESK" });
     if (response?.type !== "CONNECT_ERP") {
       return { ok: false, error: "Reload this page — Giya was updated." };
     }
@@ -244,7 +256,7 @@
     return { ok: true, connection: response.connection };
   }
   async function disconnectErp() {
-    await sendMessage({ type: "DISCONNECT_ERP" });
+    await sendRuntimeMessage({ type: "DISCONNECT_ERP" });
   }
 
   // src/content/element-picker.ts
@@ -390,28 +402,8 @@
   }
 
   // src/content/concern-client.ts
-  function extensionAlive2() {
-    try {
-      return Boolean(chrome.runtime?.id);
-    } catch {
-      return false;
-    }
-  }
-  async function sendMessage2(message) {
-    if (!extensionAlive2())
-      return null;
-    try {
-      return await chrome.runtime.sendMessage(message);
-    } catch (error) {
-      const text = error instanceof Error ? error.message : String(error);
-      if (text.includes("Extension context invalidated") || text.includes("message channel closed") || text.includes("Receiving end does not exist")) {
-        return null;
-      }
-      throw error;
-    }
-  }
   async function listConcerns() {
-    const response = await sendMessage2({ type: "LIST_CONCERNS" });
+    const response = await sendRuntimeMessage({ type: "LIST_CONCERNS" });
     if (response?.type === "CONCERNS") {
       if (response.ok)
         return { ok: true, concerns: response.concerns };
@@ -420,7 +412,7 @@
     return { ok: false, error: "Reload this page — Giya was updated." };
   }
   async function createConcern(input) {
-    const response = await sendMessage2({
+    const response = await sendRuntimeMessage({
       type: "CREATE_CONCERN",
       subject: input.subject,
       concernType: input.type,
@@ -435,7 +427,7 @@
     return { ok: false, error: "Reload this page — Giya was updated." };
   }
   async function listPagePins(href) {
-    const response = await sendMessage2({ type: "LIST_PAGE_PINS", href });
+    const response = await sendRuntimeMessage({ type: "LIST_PAGE_PINS", href });
     if (response?.type === "PAGE_PINS") {
       if (response.ok)
         return { ok: true, pins: response.pins };
@@ -444,7 +436,7 @@
     return { ok: false, error: "Reload this page — Giya was updated." };
   }
   async function addConcernPin(concernName, pin) {
-    const response = await sendMessage2({
+    const response = await sendRuntimeMessage({
       type: "ADD_CONCERN_PIN",
       concernName,
       pin
@@ -1252,7 +1244,7 @@
           if (!chrome.runtime?.id)
             return;
           if (message?.type === "AUTH_CHANGED") {
-            this.refreshSession(true).then(async (ok) => {
+            this.refreshSession(false).then(async (ok) => {
               if (ok) {
                 this.refreshPagePins(true);
                 if (this.activePanel === "login") {
@@ -2182,5 +2174,5 @@
   }
 })();
 
-//# debugId=51BB986EB2DFEC0964756E2164756E21
+//# debugId=5AB3AB3F0B3F5B8E64756E2164756E21
 //# sourceMappingURL=widget.js.map

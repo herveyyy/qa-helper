@@ -1,9 +1,9 @@
 import type { UserProfile, UserResult } from "../../../entities/user.type";
 import { normalizeErpBaseUrl } from "../../../entities/erpnext.type";
+import { getGiyaConnection } from "../auth/giya_erp_connection.usecase";
 import { readErpIdentityCookies } from "../auth/read_erp_identity_cookies.usecase";
 import { erpFetch } from "./erp_fetch.usecase";
 import { fetchErpImageDataUrl } from "./fetch_erp_image_data_url.usecase";
-import { getErpLoggedUser } from "./get_logged_user.usecase";
 
 const avatarCache = new Map<string, string>();
 
@@ -58,13 +58,11 @@ export async function getErpUserProfile(
   if (!site) return { ok: false, error: "Invalid ERPNext base URL." };
 
   const identity = await readErpIdentityCookies(site);
-  let userName = identity?.userId || "";
+  const connection = await getGiyaConnection();
+  let userName = identity?.userId || connection?.email || "";
 
-  if (!userName || userName === "Guest") {
-    const logged = await getErpLoggedUser(site, sid);
-    if (!logged.ok) return { ok: false, error: logged.error };
-    userName = logged.data.email;
-  }
+  // sid arg kept for call-site compatibility; identity is cookie/Connect based.
+  void sid;
 
   if (!userName || userName === "Guest") {
     return { ok: false, error: "Session expired." };

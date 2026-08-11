@@ -187,21 +187,28 @@ chrome.runtime.onMessage.addListener((message: ExtensionRequest, _sender, sendRe
   return true;
 });
 
+let authChangedTimer: ReturnType<typeof setTimeout> | null = null;
+
 chrome.cookies.onChanged.addListener((changeInfo) => {
   if (changeInfo.cookie.name !== "sid") return;
   if (!changeInfo.cookie.domain.includes("livro.systems")) return;
 
-  invalidateSessionCache();
-  invalidateConcernCaches();
+  // Debounce: ensureErpSidCookie / Desk login can fire many sid writes.
+  if (authChangedTimer) clearTimeout(authChangedTimer);
+  authChangedTimer = setTimeout(() => {
+    authChangedTimer = null;
+    invalidateSessionCache();
+    invalidateConcernCaches();
 
-  void chrome.tabs.query({}, (tabs) => {
-    for (const tab of tabs) {
-      if (tab.id == null) continue;
-      void chrome.tabs.sendMessage(tab.id, { type: "AUTH_CHANGED" }).catch(() => {
-        // Tab may not have the content script.
-      });
-    }
-  });
+    void chrome.tabs.query({}, (tabs) => {
+      for (const tab of tabs) {
+        if (tab.id == null) continue;
+        void chrome.tabs.sendMessage(tab.id, { type: "AUTH_CHANGED" }).catch(() => {
+          // Tab may not have the content script.
+        });
+      }
+    });
+  }, 750);
 });
 
 chrome.action.onClicked.addListener(() => {

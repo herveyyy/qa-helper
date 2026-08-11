@@ -1,4 +1,4 @@
-import type { ExtensionRequest, ExtensionResponse } from "../shared/messages.ts";
+import { sendRuntimeMessage } from "../shared/runtime_message.ts";
 
 const signedOut = document.getElementById("signed-out")!;
 const signedIn = document.getElementById("signed-in")!;
@@ -12,16 +12,19 @@ function setStatus(message: string): void {
   statusEl.textContent = message;
 }
 
-async function send<T extends ExtensionResponse>(message: ExtensionRequest): Promise<T> {
-  return (await chrome.runtime.sendMessage(message)) as T;
-}
-
 async function refresh(force = true): Promise<void> {
   setStatus(force ? "Checking Livro SID…" : "Loading…");
-  const response = await send<Extract<ExtensionResponse, { type: "SESSION" }>>({
+  const response = await sendRuntimeMessage({
     type: "GET_SESSION",
     force,
   });
+
+  if (response?.type !== "SESSION") {
+    signedIn.classList.add("hidden");
+    signedOut.classList.remove("hidden");
+    setStatus("Reload this page — Giya was updated.");
+    return;
+  }
 
   if (response.ok) {
     signedOut.classList.add("hidden");
@@ -37,7 +40,7 @@ async function refresh(force = true): Promise<void> {
 }
 
 loginBtn.addEventListener("click", () => {
-  void send({ type: "OPEN_LIVRO_LOGIN" });
+  void sendRuntimeMessage({ type: "OPEN_LIVRO_LOGIN" });
   setStatus("Finish login in the Livro tab, then check SID here.");
 });
 

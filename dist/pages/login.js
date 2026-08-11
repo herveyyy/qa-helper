@@ -1,4 +1,31 @@
 (() => {
+  // src/shared/runtime_message.ts
+  function extensionAlive() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
+    }
+  }
+  function sendRuntimeMessage(message) {
+    if (!extensionAlive())
+      return Promise.resolve(null);
+    return new Promise((resolve) => {
+      try {
+        const runtime = chrome.runtime;
+        runtime.sendMessage(message, (response) => {
+          if (runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response ?? null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
   // src/pages/login.ts
   var signedOut = document.getElementById("signed-out");
   var signedIn = document.getElementById("signed-in");
@@ -10,15 +37,18 @@
   function setStatus(message) {
     statusEl.textContent = message;
   }
-  async function send(message) {
-    return await chrome.runtime.sendMessage(message);
-  }
   async function refresh(force = true) {
     setStatus(force ? "Checking Livro SID…" : "Loading…");
-    const response = await send({
+    const response = await sendRuntimeMessage({
       type: "GET_SESSION",
       force
     });
+    if (response?.type !== "SESSION") {
+      signedIn.classList.add("hidden");
+      signedOut.classList.remove("hidden");
+      setStatus("Reload this page — Giya was updated.");
+      return;
+    }
     if (response.ok) {
       signedOut.classList.add("hidden");
       signedIn.classList.remove("hidden");
@@ -31,7 +61,7 @@
     setStatus(response.error || "Login required.");
   }
   loginBtn.addEventListener("click", () => {
-    send({ type: "OPEN_LIVRO_LOGIN" });
+    sendRuntimeMessage({ type: "OPEN_LIVRO_LOGIN" });
     setStatus("Finish login in the Livro tab, then check SID here.");
   });
   recheckBtn.addEventListener("click", () => {
@@ -49,5 +79,5 @@
   refresh(true);
 })();
 
-//# debugId=0C90239899AF85A764756E2164756E21
+//# debugId=1177778F6DC2F8FC64756E2164756E21
 //# sourceMappingURL=login.js.map

@@ -1,4 +1,4 @@
-import type { ExtensionRequest, ExtensionResponse } from "../shared/messages.ts";
+import { sendRuntimeMessage } from "../shared/runtime_message.ts";
 
 const loadingEl = document.getElementById("loading")!;
 const errorEl = document.getElementById("error")!;
@@ -18,10 +18,6 @@ const FALLBACK_AVATAR = chrome.runtime.getURL("assets/giya-icon.png");
 
 function setStatus(message: string): void {
   statusEl.textContent = message;
-}
-
-async function send<T extends ExtensionResponse>(message: ExtensionRequest): Promise<T> {
-  return (await chrome.runtime.sendMessage(message)) as T;
 }
 
 function showLoading(): void {
@@ -65,12 +61,14 @@ async function loadProfile(): Promise<void> {
   showLoading();
   setStatus("Fetching Livro user…");
 
-  const response = await send<Extract<ExtensionResponse, { type: "USER_PROFILE" }>>({
-    type: "GET_USER_PROFILE",
-  });
+  const response = await sendRuntimeMessage({ type: "GET_USER_PROFILE" });
 
-  if (!response.ok) {
-    showError(response.error || "Could not load profile.");
+  if (response?.type !== "USER_PROFILE" || !response.ok) {
+    showError(
+      response?.type === "USER_PROFILE"
+        ? response.error
+        : "Could not load profile."
+    );
     setStatus("Sign in with Livro, then refresh.");
     return;
   }
@@ -88,7 +86,7 @@ closeBtn.addEventListener("click", () => {
 });
 
 goLoginBtn.addEventListener("click", () => {
-  void send({ type: "OPEN_LOGIN_PAGE" });
+  void sendRuntimeMessage({ type: "OPEN_LOGIN_PAGE" });
 });
 
 chrome.runtime.onMessage.addListener((message: { type?: string }) => {
