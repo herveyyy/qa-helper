@@ -43,6 +43,10 @@ export async function createAssigneeConcern(
   const email = session.data.email;
   const type = (input.type || "Bugs/Issues").trim() || "Bugs/Issues";
   const priority = (input.priority || "Medium").trim() || "Medium";
+  const description =
+    input.description?.trim() ||
+    "<p>Created from Giya.</p>";
+  const expStartDate = new Date().toISOString().slice(0, 10);
 
   try {
     const res = await erpFetch(
@@ -64,7 +68,8 @@ export async function createAssigneeConcern(
             current_assignee: email,
             dev_assignee: email,
             qa_assignee: email,
-            description: input.description?.trim() || undefined,
+            description,
+            exp_start_date: expStartDate,
           },
         }),
       },

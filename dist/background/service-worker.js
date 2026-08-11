@@ -553,6 +553,8 @@
     const email = session.data.email;
     const type = (input.type || "Bugs/Issues").trim() || "Bugs/Issues";
     const priority = (input.priority || "Medium").trim() || "Medium";
+    const description = input.description?.trim() || "<p>Created from Giya.</p>";
+    const expStartDate = new Date().toISOString().slice(0, 10);
     try {
       const res = await erpFetch(`${site}/api/method/frappe.client.insert`, {
         method: "POST",
@@ -570,7 +572,8 @@
             current_assignee: email,
             dev_assignee: email,
             qa_assignee: email,
-            description: input.description?.trim() || undefined
+            description,
+            exp_start_date: expStartDate
           }
         })
       }, 20000);
@@ -1245,5 +1248,5 @@
   });
 })();
 
-//# debugId=060545461F97A54A64756E2164756E21
+//# debugId=507E995A6758A04A64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

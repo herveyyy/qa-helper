@@ -3,6 +3,7 @@ export type FabPosition = "bottom-right" | "bottom-left" | "top-right" | "top-le
 /** In-page popout views (never navigate to extension tabs). */
 export type DockPanel =
   | "concerns"
+  | "new-task"
   | "comment"
   | "environment"
   | "login"

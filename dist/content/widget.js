@@ -70,6 +70,7 @@
     user: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
     menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
     send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
     search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
     spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
   };
@@ -632,7 +633,7 @@
     }
     const sprintLabel = result.concerns[0]?.sprintAssign || "latest sprint";
     const listMarkup = result.concerns.length === 0 ? `<p class="text-xs leading-relaxed text-neutral-600">
-            No open concerns yet. Create one below for QA on this page.
+            No open concerns yet. Tap <span class="font-medium">+</span> to create a task for QA on this page.
           </p>` : `
       <p class="mb-2 text-xs text-neutral-500">
         ${escapeHtml(sprintLabel)} · current assignee. Pick a concern, then pin a UI element.
@@ -645,78 +646,29 @@
               data-concern="${escapeHtml(c.name)}"
               class="w-full rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-left transition hover:bg-white"
             >
-              <p class="font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(c.name)}</p>
+              <p class="font-mono text-[10px] font-semibold text-neutral-700">${escapeHtml(c.name)}</p>
               <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(c.subject)}</p>
               <p class="mt-1 text-[10px] text-neutral-500">${escapeHtml(c.type)} · ${escapeHtml(c.status)}${c.sprintAssign ? ` · ${escapeHtml(c.sprintAssign)}` : ""}</p>
             </button>
           </li>`).join("")}
       </ul>`;
     els.panelBody.innerHTML = `
-      <div class="mb-3 space-y-2 rounded-xl border border-black/8 bg-white/50 p-2.5">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Quick SPB</p>
-        <input
-          type="text"
-          data-create-subject
-          placeholder="Subject (e.g. QA: pin misaligned on …)"
-          class="w-full rounded-lg border border-black/10 bg-white/70 px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
-        />
-        <div class="flex gap-2">
-          <select
-            data-create-type
-            class="min-w-0 flex-1 rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
-          >
-            <option value="Bugs/Issues" selected>Bugs/Issues</option>
-            <option value="Feature Request">Feature Request</option>
-          </select>
-          <button
-            type="button"
-            data-create-spb
-            class="shrink-0 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
-          >
-            Create
-          </button>
-        </div>
-        <p data-create-status class="min-h-4 text-[10px] text-neutral-500"></p>
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <p class="text-xs text-neutral-500">Your open concerns</p>
+        <button
+          type="button"
+          data-new-task
+          class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-neutral-900 text-white transition hover:bg-neutral-800"
+          aria-label="New task"
+          title="New task"
+        >
+          ${ICONS.plus}
+        </button>
       </div>
       ${listMarkup}
     `;
-    const subjectInput = els.panelBody.querySelector("[data-create-subject]");
-    const typeSelect = els.panelBody.querySelector("[data-create-type]");
-    const createBtn = els.panelBody.querySelector("[data-create-spb]");
-    const createStatus = els.panelBody.querySelector("[data-create-status]");
-    const runCreate = () => {
-      (async () => {
-        const subject = subjectInput?.value.trim() || "";
-        if (!subject) {
-          if (createStatus)
-            createStatus.textContent = "Enter a subject.";
-          return;
-        }
-        if (createBtn)
-          createBtn.disabled = true;
-        if (createStatus)
-          createStatus.textContent = "Creating…";
-        const created = await createConcern({
-          subject,
-          type: typeSelect?.value || "Bugs/Issues",
-          description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
-        });
-        if (!created.ok) {
-          if (createStatus)
-            createStatus.textContent = created.error;
-          if (createBtn)
-            createBtn.disabled = false;
-          return;
-        }
-        host.onSelectConcern(created.concern);
-      })();
-    };
-    createBtn?.addEventListener("click", runCreate);
-    subjectInput?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        runCreate();
-      }
+    els.panelBody.querySelector("[data-new-task]")?.addEventListener("click", () => {
+      host.onNewTask();
     });
     for (const btn of els.panelBody.querySelectorAll("[data-concern]")) {
       btn.addEventListener("click", () => {
@@ -906,6 +858,79 @@
         host.refreshPagePins(true);
         host.setPanel("concerns");
       })();
+    });
+  }
+
+  // src/content/widget/panels/new-task.ts
+  function renderNewTaskPanel(els, host) {
+    els.panelTitle.textContent = "New task";
+    els.panelBody.innerHTML = `
+      <div class="space-y-3">
+        <p class="text-xs leading-relaxed text-neutral-600">
+          Creates an open Sprint Backlog on the latest R&amp;D sprint, assigned to you.
+        </p>
+        <input
+          type="text"
+          data-create-subject
+          placeholder="Subject (e.g. QA: pin misaligned on …)"
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
+        />
+        <select
+          data-create-type
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
+        >
+          <option value="Bugs/Issues" selected>Bugs/Issues</option>
+          <option value="Feature Request">Feature Request</option>
+        </select>
+        <button
+          type="button"
+          data-create-spb
+          class="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-neutral-800"
+        >
+          ${ICONS.plus}
+          Create
+        </button>
+        <p data-create-status class="min-h-4 text-[10px] text-neutral-500"></p>
+      </div>
+    `;
+    host.showPanelVisual();
+    host.focusPanelField("[data-create-subject]");
+    const subjectInput = els.panelBody.querySelector("[data-create-subject]");
+    const typeSelect = els.panelBody.querySelector("[data-create-type]");
+    const createBtn = els.panelBody.querySelector("[data-create-spb]");
+    const createStatus = els.panelBody.querySelector("[data-create-status]");
+    const idleHtml = `${ICONS.plus} Create`;
+    const runCreate = () => {
+      (async () => {
+        const subject = subjectInput?.value.trim() || "";
+        if (!subject) {
+          if (createStatus)
+            createStatus.textContent = "Enter a subject.";
+          return;
+        }
+        if (createStatus)
+          createStatus.innerHTML = loadingMarkup("Creating…");
+        setButtonBusy(createBtn, true, idleHtml);
+        const created = await createConcern({
+          subject,
+          type: typeSelect?.value || "Bugs/Issues",
+          description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
+        });
+        if (!created.ok) {
+          if (createStatus)
+            createStatus.textContent = created.error;
+          setButtonBusy(createBtn, false, idleHtml);
+          return;
+        }
+        host.onCreated(created.concern);
+      })();
+    };
+    createBtn?.addEventListener("click", runCreate);
+    subjectInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runCreate();
+      }
     });
   }
 
@@ -1677,6 +1702,10 @@
         this.setPanel("concerns");
         return;
       }
+      if (this.activePanel === "new-task") {
+        this.setPanel("concerns");
+        return;
+      }
       this.setOpen(false);
     }
     onUserClick() {
@@ -1803,7 +1832,7 @@
       const els = this.els;
       if (!els)
         return;
-      els.btnBack.dataset.active = String(this.activePanel === "comment" || this.activePanel === "concerns" || this.picker.isActive);
+      els.btnBack.dataset.active = String(this.activePanel === "comment" || this.activePanel === "concerns" || this.activePanel === "new-task" || this.picker.isActive);
       els.btnEnv.dataset.active = String(this.activePanel === "environment");
       els.btnUser.dataset.active = String(this.activePanel === "profile");
     }
@@ -1837,6 +1866,8 @@
       } else if (panel === "concerns") {
         this.renderConcernsPanel();
         return;
+      } else if (panel === "new-task") {
+        this.renderNewTaskPanel();
       } else if (panel === "comment") {
         if (!this.selectedConcern) {
           this.renderConcernsPanel();
@@ -1920,6 +1951,23 @@
           this.activePanel = "concerns";
         },
         onSelectConcern: (concern) => {
+          this.selectedConcern = concern;
+          this.picked = null;
+          this.startPicker();
+        },
+        onNewTask: () => {
+          this.setPanel("new-task");
+        }
+      });
+    }
+    renderNewTaskPanel() {
+      const els = this.els;
+      if (!els)
+        return;
+      renderNewTaskPanel(els, {
+        showPanelVisual: () => this.showPanelVisual(),
+        focusPanelField: (sel) => this.focusPanelField(sel),
+        onCreated: (concern) => {
           this.selectedConcern = concern;
           this.picked = null;
           this.startPicker();
@@ -2134,5 +2182,5 @@
   }
 })();
 
-//# debugId=B06DCB11F11C184A64756E2164756E21
+//# debugId=51BB986EB2DFEC0964756E2164756E21
 //# sourceMappingURL=widget.js.map

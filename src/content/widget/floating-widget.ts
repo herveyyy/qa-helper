@@ -23,6 +23,7 @@ import { renderCommentPanel } from "./panels/comment.ts";
 import { renderConcernsPanel } from "./panels/concerns.ts";
 import { renderEnvironmentPanel } from "./panels/environment.ts";
 import { renderLoginPanel } from "./panels/login.ts";
+import { renderNewTaskPanel } from "./panels/new-task.ts";
 import { renderProfilePanel } from "./panels/profile.ts";
 import {
   clearDraftPin,
@@ -666,6 +667,11 @@ export class FloatingWidget {
       return;
     }
 
+    if (this.activePanel === "new-task") {
+      this.setPanel("concerns");
+      return;
+    }
+
     this.setOpen(false);
   }
 
@@ -798,6 +804,7 @@ export class FloatingWidget {
     els.btnBack.dataset.active = String(
       this.activePanel === "comment" ||
         this.activePanel === "concerns" ||
+        this.activePanel === "new-task" ||
         this.picker.isActive
     );
     els.btnEnv.dataset.active = String(this.activePanel === "environment");
@@ -837,6 +844,8 @@ export class FloatingWidget {
     } else if (panel === "concerns") {
       void this.renderConcernsPanel();
       return;
+    } else if (panel === "new-task") {
+      this.renderNewTaskPanel();
     } else if (panel === "comment") {
       if (!this.selectedConcern) {
         void this.renderConcernsPanel();
@@ -921,6 +930,23 @@ export class FloatingWidget {
         this.activePanel = "concerns";
       },
       onSelectConcern: (concern) => {
+        this.selectedConcern = concern;
+        this.picked = null;
+        this.startPicker();
+      },
+      onNewTask: () => {
+        this.setPanel("new-task");
+      },
+    });
+  }
+
+  private renderNewTaskPanel(): void {
+    const els = this.els;
+    if (!els) return;
+    renderNewTaskPanel(els, {
+      showPanelVisual: () => this.showPanelVisual(),
+      focusPanelField: (sel) => this.focusPanelField(sel),
+      onCreated: (concern) => {
         this.selectedConcern = concern;
         this.picked = null;
         this.startPicker();
