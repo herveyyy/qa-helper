@@ -465,11 +465,16 @@ export class FloatingWidget {
   applyIcon(iconUrl: string): void {
     const els = this.els;
     if (!els) return;
-    const custom = Boolean(iconUrl && iconUrl.trim());
-    this.config.iconUrl = custom ? iconUrl : defaultIconUrl();
+    const trimmed = (iconUrl || "").trim();
+    // Treat empty / built-in data-URL as default so we use inline SVG (theme-aware strokes).
+    const custom =
+      Boolean(trimmed) &&
+      trimmed !== defaultIconUrl() &&
+      !trimmed.includes("faye-icon");
+    this.config.iconUrl = custom ? trimmed : "";
     els.fabLogo.hidden = custom;
     els.fabIcon.hidden = !custom;
-    if (custom) els.fabIcon.src = iconUrl;
+    if (custom) els.fabIcon.src = trimmed;
   }
 
   applyFabCoords(coords: FabCoords): void {
@@ -1315,7 +1320,7 @@ export class FloatingWidget {
 
   updateFromStorage(changes: { [key: string]: chrome.storage.StorageChange }): void {
     if (changes.iconUrl) {
-      this.applyIcon(changes.iconUrl.newValue || defaultIconUrl());
+      this.applyIcon(String(changes.iconUrl.newValue || ""));
     }
     if (changes.position) {
       this.applyPosition(changes.position.newValue as FabPosition);

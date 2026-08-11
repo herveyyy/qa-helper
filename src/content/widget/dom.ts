@@ -69,7 +69,9 @@ export async function loadConfig(): Promise<WidgetConfig> {
   );
 
   return {
-    iconUrl: stored.iconUrl || defaultIconUrl(),
+    // Empty = built-in leaf mark (currentColor). Don't substitute the data-URL default here
+    // or the FAB will render a black-stroke <img> on a black circle.
+    iconUrl: typeof stored.iconUrl === "string" ? stored.iconUrl : "",
     position: (stored.position as FabPosition) || DEFAULT_POSITION,
     sidebarWidth: Number(stored.sidebarWidth) || DEFAULT_SIDEBAR_WIDTH,
     fabCoords:

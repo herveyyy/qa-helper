@@ -57,10 +57,25 @@
   color: rgb(18 18 18);
 }
 
+/* FAB: black circle → white leaf; white circle → black leaf */
+[data-fab] {
+  border-color: rgb(255 255 255 / 0.4);
+  background: rgb(18 18 18);
+  color: rgb(250 250 250);
+  outline-color: rgb(18 18 18);
+}
+
+[data-fab] [data-fab-logo],
+[data-fab] [data-fab-logo] svg {
+  color: inherit;
+  stroke: currentColor;
+}
+
 [data-giya-theme="dark"] [data-fab] {
-  border-color: rgb(255 255 255 / 0.28);
+  border-color: rgb(0 0 0 / 0.22);
   background: rgb(250 250 250);
-  outline-color: rgb(250 250 250);
+  color: rgb(18 18 18);
+  outline-color: rgb(18 18 18);
 }
 
 [data-giya-theme="dark"] [data-backdrop] {

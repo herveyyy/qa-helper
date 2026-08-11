@@ -129,7 +129,7 @@
     const panelWidth = Math.max(MIN_PANEL_WIDTH, Number(stored.panelWidth) || DEFAULT_PANEL_WIDTH);
     const panelHeight = Math.max(MIN_PANEL_HEIGHT, Number(stored.panelHeight) || DEFAULT_PANEL_HEIGHT);
     return {
-      iconUrl: stored.iconUrl || defaultIconUrl(),
+      iconUrl: typeof stored.iconUrl === "string" ? stored.iconUrl : "",
       position: stored.position || DEFAULT_POSITION,
       sidebarWidth: Number(stored.sidebarWidth) || DEFAULT_SIDEBAR_WIDTH,
       fabCoords: typeof fabLeft === "number" && typeof fabTop === "number" ? { left: fabLeft, top: fabTop } : null,
@@ -1898,7 +1898,7 @@
       <button
         type="button"
         data-fab
-        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 text-white shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
+        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 cursor-grab active:cursor-grabbing touch-none select-none"
         aria-label="Open Faye"
         aria-expanded="false"
       >
@@ -2259,12 +2259,13 @@
       const els = this.els;
       if (!els)
         return;
-      const custom = Boolean(iconUrl && iconUrl.trim());
-      this.config.iconUrl = custom ? iconUrl : defaultIconUrl();
+      const trimmed = (iconUrl || "").trim();
+      const custom = Boolean(trimmed) && trimmed !== defaultIconUrl() && !trimmed.includes("faye-icon");
+      this.config.iconUrl = custom ? trimmed : "";
       els.fabLogo.hidden = custom;
       els.fabIcon.hidden = !custom;
       if (custom)
-        els.fabIcon.src = iconUrl;
+        els.fabIcon.src = trimmed;
     }
     applyFabCoords(coords) {
       const els = this.els;
@@ -3026,7 +3027,7 @@
     }
     updateFromStorage(changes) {
       if (changes.iconUrl) {
-        this.applyIcon(changes.iconUrl.newValue || defaultIconUrl());
+        this.applyIcon(String(changes.iconUrl.newValue || ""));
       }
       if (changes.position) {
         this.applyPosition(changes.position.newValue);
@@ -3102,5 +3103,5 @@
   }
 })();
 
-//# debugId=4B8E859F276C3AD564756E2164756E21
+//# debugId=5A17DCDB77E5201D64756E2164756E21
 //# sourceMappingURL=widget.js.map

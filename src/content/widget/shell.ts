@@ -73,7 +73,7 @@ export function widgetShellHtml(): string {
       <button
         type="button"
         data-fab
-        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 text-white shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
+        class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 cursor-grab active:cursor-grabbing touch-none select-none"
         aria-label="Open Faye"
         aria-expanded="false"
       >
