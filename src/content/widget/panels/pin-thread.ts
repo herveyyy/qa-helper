@@ -100,7 +100,9 @@ export async function renderPinThreadPanel(
         ${loadingMarkup("Loading discussion…")}
       </div>
       <div class="space-y-2 border-t border-black/8 pt-2">
-        <p data-reply-hint class="text-[11px] text-neutral-500">Reply in thread</p>
+        <div data-reply-hint class="flex flex-wrap items-center gap-2 text-[11px] text-neutral-500">
+          <span data-reply-hint-text>Reply in thread</span>
+        </div>
         <div data-reply-editor-host></div>
         <div class="flex items-center justify-between gap-2">
           <p data-reply-status class="text-xs text-neutral-500"></p>
@@ -124,6 +126,9 @@ export async function renderPinThreadPanel(
     "[data-resolve-status]"
   ) as HTMLElement;
   const replyHint = els.panelBody.querySelector("[data-reply-hint]") as HTMLElement;
+  const replyHintText = els.panelBody.querySelector(
+    "[data-reply-hint-text]"
+  ) as HTMLElement;
   const replyStatus = els.panelBody.querySelector(
     "[data-reply-status]"
   ) as HTMLElement;
@@ -134,12 +139,29 @@ export async function renderPinThreadPanel(
     "[data-reply-editor-host]"
   ) as HTMLElement;
 
-  let replyParentId = root.commentName;
+  /** null = thread reply (under root); set when user clicks Reply on a comment. */
+  let replyParentId: string | null = null;
   let comments: GiyaPinComment[] = [root];
+
+  const clearReplyTarget = () => {
+    replyParentId = null;
+    replyHintText.textContent = "Reply in thread";
+    replyHint.querySelector("[data-cancel-reply]")?.remove();
+  };
 
   const setReplyTarget = (commentName: string) => {
     replyParentId = commentName;
-    replyHint.textContent = `Replying to #${shortId(commentName)}`;
+    replyHintText.textContent = `Replying to #${shortId(commentName)}`;
+    if (!replyHint.querySelector("[data-cancel-reply]")) {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.dataset.cancelReply = "1";
+      cancel.className =
+        "text-[11px] font-medium text-neutral-700 underline-offset-2 hover:underline";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => clearReplyTarget());
+      replyHint.appendChild(cancel);
+    }
   };
 
   const paintDevops = (devopsStatus: string, resolved: boolean) => {
@@ -234,7 +256,7 @@ export async function renderPinThreadPanel(
         tagName: root.pin.tagName,
         text: html,
         threadId,
-        parentId: replyParentId,
+        parentId: replyParentId || root.commentName,
       });
 
       setButtonBusy(submitBtn, false, ICONS.send);
@@ -247,7 +269,7 @@ export async function renderPinThreadPanel(
 
       editor.clear();
       replyStatus.textContent = "Sent.";
-      setReplyTarget(root.commentName);
+      clearReplyTarget();
       await reloadThread();
     })();
   });

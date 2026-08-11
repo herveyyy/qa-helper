@@ -728,6 +728,29 @@
       try {
         document.execCommand(command, false, value);
       } catch {}
+      syncToolbarState();
+    };
+    const queryActive = (cmd) => {
+      try {
+        if (cmd.startsWith("formatBlock:")) {
+          const tag = (cmd.split(":")[1] || "").toLowerCase();
+          const block = String(document.queryCommandValue("formatBlock") || "").replace(/[<>]/g, "").toLowerCase();
+          return Boolean(tag && block === tag);
+        }
+        if (cmd === "createLink" || cmd === "image")
+          return false;
+        return document.queryCommandState(cmd);
+      } catch {
+        return false;
+      }
+    };
+    const syncToolbarState = () => {
+      for (const btn of toolbar.querySelectorAll("[data-cmd]")) {
+        const cmd = btn.dataset.cmd || "";
+        const on = queryActive(cmd);
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
     };
     toolbar.addEventListener("mousedown", (event) => {
       event.preventDefault();
@@ -752,6 +775,16 @@
         return;
       }
       run(cmd);
+    });
+    editor.addEventListener("keyup", syncToolbarState);
+    editor.addEventListener("mouseup", syncToolbarState);
+    editor.addEventListener("focus", syncToolbarState);
+    document.addEventListener("selectionchange", () => {
+      if (!host.isConnected)
+        return;
+      if (!editor.contains(document.getSelection()?.anchorNode ?? null))
+        return;
+      syncToolbarState();
     });
     fileInput.addEventListener("change", () => {
       const file = fileInput.files?.[0];
@@ -811,6 +844,7 @@
       },
       clear: () => {
         editor.innerHTML = "";
+        syncToolbarState();
       },
       focus: () => editor.focus()
     };
@@ -1402,7 +1436,9 @@
         ${loadingMarkup("Loading discussion…")}
       </div>
       <div class="space-y-2 border-t border-black/8 pt-2">
-        <p data-reply-hint class="text-[11px] text-neutral-500">Reply in thread</p>
+        <div data-reply-hint class="flex flex-wrap items-center gap-2 text-[11px] text-neutral-500">
+          <span data-reply-hint-text>Reply in thread</span>
+        </div>
         <div data-reply-editor-host></div>
         <div class="flex items-center justify-between gap-2">
           <p data-reply-status class="text-xs text-neutral-500"></p>
@@ -1421,14 +1457,29 @@
     const resolveBtn = els.panelBody.querySelector("[data-resolve]");
     const resolveStatus = els.panelBody.querySelector("[data-resolve-status]");
     const replyHint = els.panelBody.querySelector("[data-reply-hint]");
+    const replyHintText = els.panelBody.querySelector("[data-reply-hint-text]");
     const replyStatus = els.panelBody.querySelector("[data-reply-status]");
     const submitBtn = els.panelBody.querySelector("[data-reply-submit]");
     const editorHost = els.panelBody.querySelector("[data-reply-editor-host]");
-    let replyParentId = root.commentName;
+    let replyParentId = null;
     let comments = [root];
+    const clearReplyTarget = () => {
+      replyParentId = null;
+      replyHintText.textContent = "Reply in thread";
+      replyHint.querySelector("[data-cancel-reply]")?.remove();
+    };
     const setReplyTarget = (commentName) => {
       replyParentId = commentName;
-      replyHint.textContent = `Replying to #${shortId(commentName)}`;
+      replyHintText.textContent = `Replying to #${shortId(commentName)}`;
+      if (!replyHint.querySelector("[data-cancel-reply]")) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.dataset.cancelReply = "1";
+        cancel.className = "text-[11px] font-medium text-neutral-700 underline-offset-2 hover:underline";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => clearReplyTarget());
+        replyHint.appendChild(cancel);
+      }
     };
     const paintDevops = (devopsStatus, resolved) => {
       if (resolved) {
@@ -1511,7 +1562,7 @@
           tagName: root.pin.tagName,
           text: html,
           threadId,
-          parentId: replyParentId
+          parentId: replyParentId || root.commentName
         });
         setButtonBusy(submitBtn, false, ICONS.send);
         editor.setDisabled(false);
@@ -1521,7 +1572,7 @@
         }
         editor.clear();
         replyStatus.textContent = "Sent.";
-        setReplyTarget(root.commentName);
+        clearReplyTarget();
         await reloadThread();
       })();
     });
@@ -2906,5 +2957,5 @@
   }
 })();
 
-//# debugId=0665C9BC7490934A64756E2164756E21
+//# debugId=A48E70A826130BE564756E2164756E21
 //# sourceMappingURL=widget.js.map

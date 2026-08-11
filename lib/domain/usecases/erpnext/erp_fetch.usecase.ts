@@ -30,10 +30,91 @@ async function readCsrfToken(site: string): Promise<string | null> {
   }
 }
 
+async function writeCsrfCookie(site: string, token: string): Promise<void> {
+  try {
+    await chrome.cookies.set({
+      url: site,
+      name: "csrf_token",
+      value: token,
+      path: "/",
+      secure: true,
+      sameSite: "lax",
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+async function clearCsrfCookie(site: string): Promise<void> {
+  try {
+    await chrome.cookies.remove({ url: site, name: "csrf_token" });
+  } catch {
+    /* ignore */
+  }
+}
+
+function scrapeCsrf(html: string): string | null {
+  const patterns = [
+    /frappe\.csrf_token\s*=\s*["']([^"']+)["']/,
+    /csrf_token\s*=\s*["']([^"']+)["']/,
+    /"csrf_token"\s*:\s*"([^"]+)"/,
+  ];
+  for (const re of patterns) {
+    const match = re.exec(html);
+    const token = match?.[1]?.trim();
+    if (token) return token;
+  }
+  return null;
+}
+
+/** Warm csrf_token cookie when Connect/Desk left the jar without one. */
+async function ensureCsrfToken(site: string): Promise<string | null> {
+  const existing = await readCsrfToken(site);
+  if (existing) return existing;
+
+  try {
+    // Authenticated GET — no CSRF header required; Frappe often sets the cookie.
+    await fetch(`${site}/api/method/frappe.auth.get_logged_user`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    /* ignore */
+  }
+
+  let token = await readCsrfToken(site);
+  if (token) return token;
+
+  try {
+    const res = await fetch(`${site}/app`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    const html = await res.text();
+    token = scrapeCsrf(html) || (await readCsrfToken(site));
+    if (token) await writeCsrfCookie(site, token);
+    return token;
+  } catch {
+    return readCsrfToken(site);
+  }
+}
+
+async function looksLikeCsrfFailure(res: Response): Promise<boolean> {
+  if (res.status !== 400 && res.status !== 403) return false;
+  try {
+    const text = await res.clone().text();
+    return /CSRFTokenError|csrf/i.test(text);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Privileged extension fetch to erp.livro.systems.
  * Attaches sid via credentials + X-Frappe-CSRF-Token for mutating calls.
- * Never calls get_logged_user (that caused AUTH cookie storms).
  */
 export async function erpFetch(
   url: string,
@@ -44,30 +125,44 @@ export async function erpFetch(
   const method = (init.method || "GET").toUpperCase();
   const needsCsrf = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
 
-  const csrf = needsCsrf ? await readCsrfToken(site) : null;
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort("ERP_TIMEOUT"), timeoutMs);
 
   try {
     const headers = headersToRecord(init.headers);
     headers.Accept = headers.Accept || "application/json";
-    if (csrf) {
-      headers["X-Frappe-CSRF-Token"] = csrf;
-    }
-    // Let the browser set multipart boundary for FormData uploads.
     if (init.body instanceof FormData) {
       delete headers["Content-Type"];
       delete headers["content-type"];
     }
 
-    return await fetch(url, {
-      ...init,
-      credentials: "include",
-      cache: "no-store",
-      signal: controller.signal,
-      headers,
-    });
+    if (needsCsrf) {
+      const csrf = await ensureCsrfToken(site);
+      if (csrf) headers["X-Frappe-CSRF-Token"] = csrf;
+    }
+
+    const doFetch = () =>
+      fetch(url, {
+        ...init,
+        credentials: "include",
+        cache: "no-store",
+        signal: controller.signal,
+        headers,
+      });
+
+    let res = await doFetch();
+
+    // Stale csrf cookie → refresh once and retry.
+    if (needsCsrf && (await looksLikeCsrfFailure(res))) {
+      await clearCsrfCookie(site);
+      const csrf = await ensureCsrfToken(site);
+      if (csrf) {
+        headers["X-Frappe-CSRF-Token"] = csrf;
+        res = await doFetch();
+      }
+    }
+
+    return res;
   } finally {
     clearTimeout(timer);
   }

@@ -70,6 +70,32 @@ export function mountRichCommentEditor(
     } catch {
       /* ignore unsupported */
     }
+    syncToolbarState();
+  };
+
+  const queryActive = (cmd: string): boolean => {
+    try {
+      if (cmd.startsWith("formatBlock:")) {
+        const tag = (cmd.split(":")[1] || "").toLowerCase();
+        const block = String(document.queryCommandValue("formatBlock") || "")
+          .replace(/[<>]/g, "")
+          .toLowerCase();
+        return Boolean(tag && block === tag);
+      }
+      if (cmd === "createLink" || cmd === "image") return false;
+      return document.queryCommandState(cmd);
+    } catch {
+      return false;
+    }
+  };
+
+  const syncToolbarState = () => {
+    for (const btn of toolbar.querySelectorAll<HTMLButtonElement>("[data-cmd]")) {
+      const cmd = btn.dataset.cmd || "";
+      const on = queryActive(cmd);
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    }
   };
 
   toolbar.addEventListener("mousedown", (event) => {
@@ -101,6 +127,15 @@ export function mountRichCommentEditor(
     }
 
     run(cmd);
+  });
+
+  editor.addEventListener("keyup", syncToolbarState);
+  editor.addEventListener("mouseup", syncToolbarState);
+  editor.addEventListener("focus", syncToolbarState);
+  document.addEventListener("selectionchange", () => {
+    if (!host.isConnected) return;
+    if (!editor.contains(document.getSelection()?.anchorNode ?? null)) return;
+    syncToolbarState();
   });
 
   fileInput.addEventListener("change", () => {
@@ -168,6 +203,7 @@ export function mountRichCommentEditor(
     },
     clear: () => {
       editor.innerHTML = "";
+      syncToolbarState();
     },
     focus: () => editor.focus(),
   };

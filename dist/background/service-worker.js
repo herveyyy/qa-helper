@@ -432,30 +432,112 @@
       return null;
     }
   }
+  async function writeCsrfCookie(site, token) {
+    try {
+      await chrome.cookies.set({
+        url: site,
+        name: "csrf_token",
+        value: token,
+        path: "/",
+        secure: true,
+        sameSite: "lax"
+      });
+    } catch {}
+  }
+  async function clearCsrfCookie(site) {
+    try {
+      await chrome.cookies.remove({ url: site, name: "csrf_token" });
+    } catch {}
+  }
+  function scrapeCsrf(html) {
+    const patterns = [
+      /frappe\.csrf_token\s*=\s*["']([^"']+)["']/,
+      /csrf_token\s*=\s*["']([^"']+)["']/,
+      /"csrf_token"\s*:\s*"([^"]+)"/
+    ];
+    for (const re of patterns) {
+      const match = re.exec(html);
+      const token = match?.[1]?.trim();
+      if (token)
+        return token;
+    }
+    return null;
+  }
+  async function ensureCsrfToken(site) {
+    const existing = await readCsrfToken(site);
+    if (existing)
+      return existing;
+    try {
+      await fetch(`${site}/api/method/frappe.auth.get_logged_user`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" }
+      });
+    } catch {}
+    let token = await readCsrfToken(site);
+    if (token)
+      return token;
+    try {
+      const res = await fetch(`${site}/app`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store"
+      });
+      const html = await res.text();
+      token = scrapeCsrf(html) || await readCsrfToken(site);
+      if (token)
+        await writeCsrfCookie(site, token);
+      return token;
+    } catch {
+      return readCsrfToken(site);
+    }
+  }
+  async function looksLikeCsrfFailure(res) {
+    if (res.status !== 400 && res.status !== 403)
+      return false;
+    try {
+      const text = await res.clone().text();
+      return /CSRFTokenError|csrf/i.test(text);
+    } catch {
+      return false;
+    }
+  }
   async function erpFetch(url, init = {}, timeoutMs = 15000) {
     const site = normalizeErpBaseUrl(url) || ERP_BASE_URL;
     const method = (init.method || "GET").toUpperCase();
     const needsCsrf = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
-    const csrf = needsCsrf ? await readCsrfToken(site) : null;
     const controller = new AbortController;
     const timer = setTimeout(() => controller.abort("ERP_TIMEOUT"), timeoutMs);
     try {
       const headers = headersToRecord(init.headers);
       headers.Accept = headers.Accept || "application/json";
-      if (csrf) {
-        headers["X-Frappe-CSRF-Token"] = csrf;
-      }
       if (init.body instanceof FormData) {
         delete headers["Content-Type"];
         delete headers["content-type"];
       }
-      return await fetch(url, {
+      if (needsCsrf) {
+        const csrf = await ensureCsrfToken(site);
+        if (csrf)
+          headers["X-Frappe-CSRF-Token"] = csrf;
+      }
+      const doFetch = () => fetch(url, {
         ...init,
         credentials: "include",
         cache: "no-store",
         signal: controller.signal,
         headers
       });
+      let res = await doFetch();
+      if (needsCsrf && await looksLikeCsrfFailure(res)) {
+        await clearCsrfCookie(site);
+        const csrf = await ensureCsrfToken(site);
+        if (csrf) {
+          headers["X-Frappe-CSRF-Token"] = csrf;
+          res = await doFetch();
+        }
+      }
+      return res;
     } finally {
       clearTimeout(timer);
     }
@@ -937,10 +1019,16 @@
           comment_by: commentBy
         })
       });
-      if (!res.ok) {
+      const json = await res.json();
+      if (!res.ok || json.exc || json.exc_type) {
+        if (/csrf/i.test(String(json.exc_type || json.exc || ""))) {
+          return {
+            ok: false,
+            error: "Livro session CSRF expired — reconnect in Faye, then retry."
+          };
+        }
         return { ok: false, error: `Could not save comment (${res.status}).` };
       }
-      const json = await res.json();
       const commentName = json.message?.name;
       if (!commentName)
         return { ok: false, error: "Comment saved but id missing." };
@@ -1719,5 +1807,5 @@
   });
 })();
 
-//# debugId=27D0F64281F7D4B264756E2164756E21
+//# debugId=66FC4A8EF236AAC164756E2164756E21
 //# sourceMappingURL=service-worker.js.map

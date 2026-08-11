@@ -46,11 +46,22 @@ export async function addConcernPinComment(
       }),
     });
 
-    if (!res.ok) {
+    const json = (await res.json()) as {
+      message?: { name?: string };
+      exc?: string;
+      exc_type?: string;
+    };
+
+    if (!res.ok || json.exc || json.exc_type) {
+      if (/csrf/i.test(String(json.exc_type || json.exc || ""))) {
+        return {
+          ok: false,
+          error: "Livro session CSRF expired — reconnect in Faye, then retry.",
+        };
+      }
       return { ok: false, error: `Could not save comment (${res.status}).` };
     }
 
-    const json = (await res.json()) as { message?: { name?: string } };
     const commentName = json.message?.name;
     if (!commentName) return { ok: false, error: "Comment saved but id missing." };
 
