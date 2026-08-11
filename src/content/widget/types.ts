@@ -9,12 +9,13 @@ export interface WidgetElements {
   panelHeader: HTMLElement;
   panelTitle: HTMLElement;
   panelBody: HTMLElement;
+  panelResize: HTMLDivElement;
   highlight: HTMLDivElement;
   pickHint: HTMLDivElement;
   pinLayer: HTMLDivElement;
   fab: HTMLButtonElement;
   fabIcon: HTMLImageElement;
-  btnBack: HTMLButtonElement;
+  btnNav: HTMLButtonElement;
   btnEnv: HTMLButtonElement;
   btnUser: HTMLButtonElement;
   btnTheme: HTMLButtonElement;

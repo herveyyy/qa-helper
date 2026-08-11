@@ -21,6 +21,7 @@ export type GiyaPinPayload = {
   selector: string;
   label: string;
   tagName: string;
+  /** Frappe Comment HTML (sanitized); may include <img> from Livro uploads. */
   text: string;
   /** Browser / page specs captured when the comment was posted. */
   envSpecs?: GiyaPinEnvSpec[];

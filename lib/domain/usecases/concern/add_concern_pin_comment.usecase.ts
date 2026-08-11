@@ -4,6 +4,10 @@ import { getExtensionSession } from "../auth/get_extension_session.usecase";
 import { getErpUserProfile } from "../erpnext/get_erp_user_profile.usecase";
 import { erpErrorMessage, erpFetch } from "../erpnext/erp_fetch.usecase";
 import { buildGiyaPinCommentHtml } from "./giya_pin_markup.usecase";
+import {
+  isBlankCommentHtml,
+  sanitizeCommentHtml,
+} from "./sanitize_comment_html.usecase";
 
 /** Post a Giya UI pin as a timeline Comment on a Sprint Backlogs concern. */
 export async function addConcernPinComment(
@@ -16,7 +20,11 @@ export async function addConcernPinComment(
 
   const name = concernName.trim();
   if (!name) return { ok: false, error: "Pick a concern (SPB) first." };
-  if (!pin.text.trim()) return { ok: false, error: "Write a comment first." };
+
+  const html = sanitizeCommentHtml(pin.text);
+  if (isBlankCommentHtml(html)) {
+    return { ok: false, error: "Write a comment first." };
+  }
 
   const session = await getExtensionSession(site);
   if (!session.ok) return session;
@@ -32,7 +40,7 @@ export async function addConcernPinComment(
       body: JSON.stringify({
         reference_doctype: "Sprint Backlogs",
         reference_name: name,
-        content: buildGiyaPinCommentHtml({ ...pin, text: pin.text.trim() }),
+        content: buildGiyaPinCommentHtml({ ...pin, text: html }),
         comment_email: commentEmail,
         comment_by: commentBy,
       }),

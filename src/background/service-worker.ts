@@ -15,6 +15,7 @@ import {
   invalidateConcernCaches,
   listAssigneeConcerns,
   listPagePinComments,
+  uploadErpFile,
 } from "../../lib/domain/services/concern.service";
 import { getUserProfile, openUserPage } from "../../lib/domain/services/user.service";
 import { ERP_BASE_URL } from "../../lib/entities/erpnext.type";
@@ -143,6 +144,28 @@ async function handleMessage(message: ExtensionRequest): Promise<ExtensionRespon
     return result.ok
       ? { type: "PIN_SAVED", ok: true, commentName: result.data.commentName }
       : { type: "PIN_SAVED", ok: false, error: result.error };
+  }
+
+  if (message.type === "UPLOAD_ERP_FILE") {
+    const result = await uploadErpFile(
+      {
+        filename: message.filename,
+        mimeType: message.mimeType,
+        base64: message.base64,
+        doctype: message.doctype,
+        docname: message.docname,
+        isPrivate: message.isPrivate,
+      },
+      ERP_BASE_URL
+    );
+    return result.ok
+      ? {
+          type: "ERP_FILE",
+          ok: true,
+          fileUrl: result.data.fileUrl,
+          fileName: result.data.fileName,
+        }
+      : { type: "ERP_FILE", ok: false, error: result.error };
   }
 
   if (message.type === "OPEN_LOGIN_PAGE") {

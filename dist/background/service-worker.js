@@ -445,6 +445,10 @@
       if (csrf) {
         headers["X-Frappe-CSRF-Token"] = csrf;
       }
+      if (init.body instanceof FormData) {
+        delete headers["Content-Type"];
+        delete headers["content-type"];
+      }
       return await fetch(url, {
         ...init,
         credentials: "include",
@@ -778,6 +782,78 @@
     }
   }
 
+  // lib/domain/usecases/concern/sanitize_comment_html.usecase.ts
+  var ALLOWED_TAG = /^(?:a|b|blockquote|br|code|div|em|h1|h2|h3|i|img|li|ol|p|pre|s|span|strong|strike|u|ul)$/i;
+  function decodeEntities(value) {
+    return value.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
+  }
+  function commentHtmlToPlainText(html) {
+    return decodeEntities(String(html || "").replace(/<br\s*\/?>/gi, `
+`).replace(/<\/p>/gi, `
+`).replace(/<[^>]+>/g, "")).replace(/\u00a0/g, " ").replace(/[ \t]+\n/g, `
+`).replace(/\n{3,}/g, `
+
+`).trim();
+  }
+  function isBlankCommentHtml(html) {
+    return !commentHtmlToPlainText(html);
+  }
+  function sanitizeOpenTag(raw) {
+    const match = raw.match(/^<\s*([a-z0-9]+)([^>]*)>/i);
+    if (!match)
+      return "";
+    const tag = match[1].toLowerCase();
+    if (!ALLOWED_TAG.test(tag))
+      return "";
+    if (tag === "br")
+      return "<br>";
+    const attrs = match[2] || "";
+    const kept = [];
+    if (tag === "a") {
+      const href = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const value = (href?.[2] || href?.[3] || href?.[4] || "").trim();
+      if (/^(https?:|mailto:|\/|#)/i.test(value)) {
+        kept.push(`href="${value.replaceAll('"', "")}"`);
+        kept.push('target="_blank"');
+        kept.push('rel="noopener noreferrer"');
+      }
+    }
+    if (tag === "img") {
+      const src = attrs.match(/\bsrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const value = (src?.[2] || src?.[3] || src?.[4] || "").trim();
+      if (/^(https?:|\/)/i.test(value) || /^data:image\//i.test(value)) {
+        kept.push(`src="${value.replaceAll('"', "")}"`);
+        kept.push('style="max-width:100%;height:auto"');
+      } else {
+        return "";
+      }
+      const alt = attrs.match(/\balt\s*=\s*("([^"]*)"|'([^']*)')/i);
+      if (alt)
+        kept.push(`alt="${(alt[2] || alt[3] || "").replaceAll('"', "")}"`);
+    }
+    return kept.length ? `<${tag} ${kept.join(" ")}>` : `<${tag}>`;
+  }
+  function sanitizeCommentHtml(html) {
+    let out = String(html || "");
+    out = out.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+    out = out.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+    out = out.replace(/<!--[\s\S]*?-->/g, "");
+    out = out.replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    out = out.replace(/javascript:/gi, "");
+    out = out.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (full, tag, rest) => {
+      const name = tag.toLowerCase();
+      if (full.startsWith("</")) {
+        return ALLOWED_TAG.test(name) ? `</${name}>` : "";
+      }
+      if (full.endsWith("/>") || name === "br" || name === "img") {
+        const open = sanitizeOpenTag(`<${name}${rest}>`);
+        return open;
+      }
+      return sanitizeOpenTag(`<${name}${rest}>`);
+    });
+    return out.trim();
+  }
+
   // lib/domain/usecases/concern/giya_pin_markup.usecase.ts
   var MARKER = "data-giya-pin";
   function escapeAttr(value) {
@@ -793,9 +869,14 @@
     return `<details style="margin-top:8px">` + `<summary><small>System specs</small></summary>` + `<ul style="margin:6px 0 0;padding-left:18px;font-size:12px">${rows}</ul>` + `</details>`;
   }
   function buildGiyaPinCommentHtml(pin) {
-    const payload = escapeAttr(JSON.stringify(pin));
+    const bodyHtml = sanitizeCommentHtml(pin.text);
+    const plain = commentHtmlToPlainText(bodyHtml) || pin.label;
+    const payload = escapeAttr(JSON.stringify({
+      ...pin,
+      text: bodyHtml
+    }));
     const specsHtml = pin.envSpecs?.length ? buildEnvSpecsHtml(pin.envSpecs) : "";
-    return `<div ${MARKER}="1" data-giya-json="${payload}">` + `<p>${escapeHtml(pin.text)}</p>` + `<p><small>Giya pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a></small></p>` + specsHtml + `</div>`;
+    return `<div ${MARKER}="1" data-giya-json="${payload}">` + `<div class="giya-comment-body">${bodyHtml}</div>` + `<p><small>Giya pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a>` + (plain ? ` · ${escapeHtml(plain.slice(0, 80))}` : "") + `</small></p>` + specsHtml + `</div>`;
   }
   function parseGiyaPinFromCommentHtml(content) {
     if (!content.includes(MARKER))
@@ -808,7 +889,10 @@
       const parsed = JSON.parse(decoded);
       if (parsed?.v !== 1 || !parsed.href || !parsed.selector || !parsed.text)
         return null;
-      return parsed;
+      return {
+        ...parsed,
+        text: sanitizeCommentHtml(parsed.text)
+      };
     } catch {
       return null;
     }
@@ -831,8 +915,10 @@
     const name = concernName.trim();
     if (!name)
       return { ok: false, error: "Pick a concern (SPB) first." };
-    if (!pin.text.trim())
+    const html = sanitizeCommentHtml(pin.text);
+    if (isBlankCommentHtml(html)) {
       return { ok: false, error: "Write a comment first." };
+    }
     const session = await getExtensionSession(site);
     if (!session.ok)
       return session;
@@ -846,7 +932,7 @@
         body: JSON.stringify({
           reference_doctype: "Sprint Backlogs",
           reference_name: name,
-          content: buildGiyaPinCommentHtml({ ...pin, text: pin.text.trim() }),
+          content: buildGiyaPinCommentHtml({ ...pin, text: html }),
           comment_email: commentEmail,
           comment_by: commentBy
         })
@@ -1027,6 +1113,62 @@
     }
   }
 
+  // lib/domain/usecases/erpnext/upload_erp_file.usecase.ts
+  function decodeBase64(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0;i < binary.length; i++)
+      bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+  async function uploadErpFile(input, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const filename = input.filename.trim() || "upload.bin";
+    if (!input.base64)
+      return { ok: false, error: "No file data." };
+    try {
+      const bytes = decodeBase64(input.base64);
+      const blob = new Blob([bytes.buffer], {
+        type: input.mimeType || "application/octet-stream"
+      });
+      const form = new FormData;
+      form.append("file", blob, filename);
+      form.append("is_private", input.isPrivate === false ? "0" : "1");
+      form.append("folder", "Home/Attachments");
+      if (input.doctype)
+        form.append("doctype", input.doctype);
+      if (input.docname)
+        form.append("docname", input.docname);
+      const res = await erpFetch(`${site}/api/method/upload_file`, { method: "POST", body: form }, 60000);
+      if (!res.ok) {
+        return { ok: false, error: `Upload failed (${res.status}).` };
+      }
+      const json = await res.json();
+      if (json.exc) {
+        return { ok: false, error: "Upload rejected by Livro." };
+      }
+      const fileUrl = json.message?.file_url?.trim() || "";
+      if (!fileUrl)
+        return { ok: false, error: "Upload succeeded but no file URL." };
+      const absolute = fileUrl.startsWith("http") ? fileUrl : `${site}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+      return {
+        ok: true,
+        data: {
+          fileUrl: absolute,
+          fileName: json.message?.file_name || filename
+        }
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to upload file.")
+      };
+    }
+  }
+
   // lib/domain/services/concern.service.ts
   var CONCERNS_TTL_MS = 60000;
   var PINS_TTL_MS = 30000;
@@ -1084,6 +1226,9 @@
     if (result.ok)
       invalidateConcernCaches();
     return result;
+  }
+  async function uploadErpFile2(input, baseUrl = ERP_BASE_URL) {
+    return uploadErpFile(input, baseUrl);
   }
   async function listPagePinComments2(pageHref, baseUrl = ERP_BASE_URL, options = {}) {
     const session = await getExtensionSession(baseUrl);
@@ -1164,6 +1309,8 @@
   // src/shared/defaults.ts
   var DEFAULT_POSITION = "bottom-right";
   var DEFAULT_SIDEBAR_WIDTH = 360;
+  var DEFAULT_PANEL_WIDTH = 380;
+  var DEFAULT_PANEL_HEIGHT = 440;
   var DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
   var STORAGE_DEFAULTS = {
     iconUrl: "",
@@ -1173,6 +1320,8 @@
     fabTop: null,
     pinned: false,
     theme: "dark",
+    panelWidth: DEFAULT_PANEL_WIDTH,
+    panelHeight: DEFAULT_PANEL_HEIGHT,
     allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
 
@@ -1265,6 +1414,22 @@
       const result = await addConcernPinComment2(message.concernName, message.pin, ERP_BASE_URL);
       return result.ok ? { type: "PIN_SAVED", ok: true, commentName: result.data.commentName } : { type: "PIN_SAVED", ok: false, error: result.error };
     }
+    if (message.type === "UPLOAD_ERP_FILE") {
+      const result = await uploadErpFile2({
+        filename: message.filename,
+        mimeType: message.mimeType,
+        base64: message.base64,
+        doctype: message.doctype,
+        docname: message.docname,
+        isPrivate: message.isPrivate
+      }, ERP_BASE_URL);
+      return result.ok ? {
+        type: "ERP_FILE",
+        ok: true,
+        fileUrl: result.data.fileUrl,
+        fileName: result.data.fileName
+      } : { type: "ERP_FILE", ok: false, error: result.error };
+    }
     if (message.type === "OPEN_LOGIN_PAGE") {
       openExtensionLoginPage();
       return { type: "OPENED_LOGIN" };
@@ -1326,5 +1491,5 @@
   });
 })();
 
-//# debugId=EF366353C9CC2B1364756E2164756E21
+//# debugId=F311FE0D0ABEE38B64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

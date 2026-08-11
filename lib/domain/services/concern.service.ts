@@ -13,6 +13,10 @@ import {
 import { addConcernPinComment as addConcernPinCommentUseCase } from "../usecases/concern/add_concern_pin_comment.usecase";
 import { listAssigneeConcerns as listAssigneeConcernsUseCase } from "../usecases/concern/list_assignee_concerns.usecase";
 import { listPagePinComments as listPagePinCommentsUseCase } from "../usecases/concern/list_page_pin_comments.usecase";
+import {
+  uploadErpFile as uploadErpFileUseCase,
+  type UploadErpFileInput,
+} from "../usecases/erpnext/upload_erp_file.usecase";
 
 const CONCERNS_TTL_MS = 60_000;
 const PINS_TTL_MS = 30_000;
@@ -94,6 +98,13 @@ export async function addConcernPinComment(
   const result = await addConcernPinCommentUseCase(concernName, pin, baseUrl);
   if (result.ok) invalidateConcernCaches();
   return result;
+}
+
+export async function uploadErpFile(
+  input: UploadErpFileInput,
+  baseUrl: string = ERP_BASE_URL
+) {
+  return uploadErpFileUseCase(input, baseUrl);
 }
 
 export async function listPagePinComments(

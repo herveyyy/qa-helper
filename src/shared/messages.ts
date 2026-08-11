@@ -31,6 +31,15 @@ export type ExtensionRequest =
     }
   | { type: "LIST_PAGE_PINS"; href: string }
   | { type: "ADD_CONCERN_PIN"; concernName: string; pin: GiyaPinPayload }
+  | {
+      type: "UPLOAD_ERP_FILE";
+      filename: string;
+      mimeType: string;
+      base64: string;
+      doctype?: string;
+      docname?: string;
+      isPrivate?: boolean;
+    }
   | { type: "OPEN_LOGIN_PAGE" }
   | { type: "OPEN_USER_PAGE" }
   | { type: "OPEN_LIVRO_LOGIN" };
@@ -66,5 +75,7 @@ export type ExtensionResponse =
   | { type: "PAGE_PINS"; ok: false; error: string }
   | { type: "PIN_SAVED"; ok: true; commentName: string }
   | { type: "PIN_SAVED"; ok: false; error: string }
+  | { type: "ERP_FILE"; ok: true; fileUrl: string; fileName: string }
+  | { type: "ERP_FILE"; ok: false; error: string }
   | { type: "OPENED_LOGIN" }
   | { type: "OPENED_USER" };

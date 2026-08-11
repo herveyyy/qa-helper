@@ -26,6 +26,8 @@ export interface WidgetConfig {
   fabCoords: FabCoords | null;
   pinned: boolean;
   theme: GiyaTheme;
+  panelWidth: number;
+  panelHeight: number;
 }
 
 export interface StoredSettings {
@@ -36,6 +38,8 @@ export interface StoredSettings {
   fabTop: number | null;
   pinned: boolean;
   theme: GiyaTheme;
+  panelWidth: number;
+  panelHeight: number;
   /** Host/origin patterns where the widget may mount (e.g. `wela.dev`, `*.livro.systems`). */
   allowedOrigins: string[];
 }

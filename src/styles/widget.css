@@ -114,3 +114,114 @@
 [data-giya-theme="dark"] [data-panel-body] [class*="hover:bg-neutral-800"]:hover {
   background-color: rgb(229 229 229) !important;
 }
+
+[data-giya-theme="dark"] [data-panel-resize] span {
+  border-color: rgb(163 163 163 / 0.9);
+}
+
+[data-panel] {
+  position: fixed;
+}
+
+[data-panel-resize] {
+  z-index: 2;
+}
+
+/* Frappe-like comment editor */
+.giya-rte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.giya-rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgb(38 38 38);
+  color: white;
+}
+
+.giya-rte-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.3rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.giya-rte-btn:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.giya-rte-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.giya-rte-sep {
+  width: 1px;
+  height: 0.9rem;
+  margin: 0 0.15rem;
+  background: rgb(255 255 255 / 0.25);
+}
+
+.giya-rte-editor {
+  min-height: 7rem;
+  max-height: 14rem;
+  overflow: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(0 0 0 / 0.1);
+  background: rgb(255 255 255 / 0.65);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: rgb(38 38 38);
+  outline: none;
+}
+
+.giya-rte-editor:focus {
+  box-shadow: 0 0 0 2px rgb(23 23 23 / 0.35);
+}
+
+.giya-rte-editor:empty::before {
+  content: attr(data-placeholder);
+  color: rgb(163 163 163);
+  pointer-events: none;
+}
+
+.giya-rte-editor img,
+.giya-comment-html img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.4rem;
+  margin: 0.35rem 0;
+}
+
+.giya-comment-html p {
+  margin: 0.25rem 0;
+}
+
+[data-giya-theme="dark"] .giya-rte-editor {
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(38 38 38 / 0.85);
+  color: rgb(245 245 245);
+}
+
+[data-giya-theme="dark"] .giya-rte-editor:empty::before {
+  color: rgb(115 115 115);
+}
+
+[data-giya-theme="dark"] .giya-comment-html {
+  color: rgb(245 245 245) !important;
+}

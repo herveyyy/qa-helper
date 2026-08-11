@@ -2,6 +2,10 @@ import type { FabPosition, StoredSettings } from "./types.ts";
 
 export const DEFAULT_POSITION: FabPosition = "bottom-right";
 export const DEFAULT_SIDEBAR_WIDTH = 360;
+export const DEFAULT_PANEL_WIDTH = 380;
+export const DEFAULT_PANEL_HEIGHT = 440;
+export const MIN_PANEL_WIDTH = 280;
+export const MIN_PANEL_HEIGHT = 240;
 export const FAB_SIZE = 32;
 export const DOCK_WIDTH = 44;
 export const FAB_MARGIN = 16;
@@ -17,6 +21,8 @@ export const STORAGE_DEFAULTS: StoredSettings = {
   fabTop: null,
   pinned: false,
   theme: "dark",
+  panelWidth: DEFAULT_PANEL_WIDTH,
+  panelHeight: DEFAULT_PANEL_HEIGHT,
   allowedOrigins: DEFAULT_ALLOWED_ORIGINS,
 };
 

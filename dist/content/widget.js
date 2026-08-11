@@ -41,6 +41,10 @@
   // src/shared/defaults.ts
   var DEFAULT_POSITION = "bottom-right";
   var DEFAULT_SIDEBAR_WIDTH = 360;
+  var DEFAULT_PANEL_WIDTH = 380;
+  var DEFAULT_PANEL_HEIGHT = 440;
+  var MIN_PANEL_WIDTH = 280;
+  var MIN_PANEL_HEIGHT = 240;
   var FAB_SIZE = 32;
   var DOCK_WIDTH = 44;
   var FAB_MARGIN = 16;
@@ -54,6 +58,8 @@
     fabTop: null,
     pinned: false,
     theme: "dark",
+    panelWidth: DEFAULT_PANEL_WIDTH,
+    panelHeight: DEFAULT_PANEL_HEIGHT,
     allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
   function defaultIconUrl() {
@@ -70,11 +76,13 @@
     login: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>`,
     user: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
     menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
+    concerns: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>`,
     send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
     plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
     refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>`,
     sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
     moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
+    image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
     search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
     spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
   };
@@ -111,13 +119,17 @@
     const fabLeft = stored.fabLeft;
     const fabTop = stored.fabTop;
     const theme = stored.theme === "light" || stored.theme === "dark" ? stored.theme : "dark";
+    const panelWidth = Math.max(MIN_PANEL_WIDTH, Number(stored.panelWidth) || DEFAULT_PANEL_WIDTH);
+    const panelHeight = Math.max(MIN_PANEL_HEIGHT, Number(stored.panelHeight) || DEFAULT_PANEL_HEIGHT);
     return {
       iconUrl: stored.iconUrl || defaultIconUrl(),
       position: stored.position || DEFAULT_POSITION,
       sidebarWidth: Number(stored.sidebarWidth) || DEFAULT_SIDEBAR_WIDTH,
       fabCoords: typeof fabLeft === "number" && typeof fabTop === "number" ? { left: fabLeft, top: fabTop } : null,
       pinned: Boolean(stored.pinned),
-      theme
+      theme,
+      panelWidth,
+      panelHeight
     };
   }
   async function loadStyles(shadow) {
@@ -478,6 +490,35 @@
     }
     return { ok: false, error: "Reload this page — Giya was updated." };
   }
+  async function uploadErpFile(input) {
+    const maxBytes = 4 * 1024 * 1024;
+    if (input.file.size > maxBytes) {
+      return { ok: false, error: "Image too large (max 4 MB)." };
+    }
+    const buffer = await input.file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    const chunk = 32768;
+    for (let i = 0;i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const response = await sendRuntimeMessage({
+      type: "UPLOAD_ERP_FILE",
+      filename: input.file.name || "image.png",
+      mimeType: input.file.type || "application/octet-stream",
+      base64: btoa(binary),
+      doctype: input.doctype,
+      docname: input.docname,
+      isPrivate: input.isPrivate
+    });
+    if (response?.type === "ERP_FILE") {
+      if (response.ok) {
+        return { ok: true, fileUrl: response.fileUrl, fileName: response.fileName };
+      }
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Giya was updated." };
+  }
 
   // src/content/env-specs.ts
   function collectEnvSpecs() {
@@ -529,6 +570,208 @@
     ];
   }
 
+  // lib/domain/usecases/concern/sanitize_comment_html.usecase.ts
+  var ALLOWED_TAG = /^(?:a|b|blockquote|br|code|div|em|h1|h2|h3|i|img|li|ol|p|pre|s|span|strong|strike|u|ul)$/i;
+  function decodeEntities(value) {
+    return value.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
+  }
+  function commentHtmlToPlainText(html) {
+    return decodeEntities(String(html || "").replace(/<br\s*\/?>/gi, `
+`).replace(/<\/p>/gi, `
+`).replace(/<[^>]+>/g, "")).replace(/\u00a0/g, " ").replace(/[ \t]+\n/g, `
+`).replace(/\n{3,}/g, `
+
+`).trim();
+  }
+  function isBlankCommentHtml(html) {
+    return !commentHtmlToPlainText(html);
+  }
+  function sanitizeOpenTag(raw) {
+    const match = raw.match(/^<\s*([a-z0-9]+)([^>]*)>/i);
+    if (!match)
+      return "";
+    const tag = match[1].toLowerCase();
+    if (!ALLOWED_TAG.test(tag))
+      return "";
+    if (tag === "br")
+      return "<br>";
+    const attrs = match[2] || "";
+    const kept = [];
+    if (tag === "a") {
+      const href = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const value = (href?.[2] || href?.[3] || href?.[4] || "").trim();
+      if (/^(https?:|mailto:|\/|#)/i.test(value)) {
+        kept.push(`href="${value.replaceAll('"', "")}"`);
+        kept.push('target="_blank"');
+        kept.push('rel="noopener noreferrer"');
+      }
+    }
+    if (tag === "img") {
+      const src = attrs.match(/\bsrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const value = (src?.[2] || src?.[3] || src?.[4] || "").trim();
+      if (/^(https?:|\/)/i.test(value) || /^data:image\//i.test(value)) {
+        kept.push(`src="${value.replaceAll('"', "")}"`);
+        kept.push('style="max-width:100%;height:auto"');
+      } else {
+        return "";
+      }
+      const alt = attrs.match(/\balt\s*=\s*("([^"]*)"|'([^']*)')/i);
+      if (alt)
+        kept.push(`alt="${(alt[2] || alt[3] || "").replaceAll('"', "")}"`);
+    }
+    return kept.length ? `<${tag} ${kept.join(" ")}>` : `<${tag}>`;
+  }
+  function sanitizeCommentHtml(html) {
+    let out = String(html || "");
+    out = out.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+    out = out.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+    out = out.replace(/<!--[\s\S]*?-->/g, "");
+    out = out.replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    out = out.replace(/javascript:/gi, "");
+    out = out.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (full, tag, rest) => {
+      const name = tag.toLowerCase();
+      if (full.startsWith("</")) {
+        return ALLOWED_TAG.test(name) ? `</${name}>` : "";
+      }
+      if (full.endsWith("/>") || name === "br" || name === "img") {
+        const open = sanitizeOpenTag(`<${name}${rest}>`);
+        return open;
+      }
+      return sanitizeOpenTag(`<${name}${rest}>`);
+    });
+    return out.trim();
+  }
+
+  // src/content/widget/rich-editor.ts
+  function toolbarButton(cmd, label, title) {
+    return `<button type="button" data-cmd="${cmd}" class="giya-rte-btn" title="${title}" aria-label="${title}">${label}</button>`;
+  }
+  function mountRichCommentEditor(host, opts = {}) {
+    host.innerHTML = `
+    <div class="giya-rte" data-giya-rte>
+      <div class="giya-rte-toolbar" role="toolbar" aria-label="Comment formatting">
+        ${toolbarButton("bold", "<b>B</b>", "Bold")}
+        ${toolbarButton("italic", "<i>I</i>", "Italic")}
+        ${toolbarButton("underline", "<u>U</u>", "Underline")}
+        ${toolbarButton("strikeThrough", "<s>S</s>", "Strikethrough")}
+        <span class="giya-rte-sep" aria-hidden="true"></span>
+        ${toolbarButton("insertUnorderedList", "•", "Bullet list")}
+        ${toolbarButton("insertOrderedList", "1.", "Numbered list")}
+        ${toolbarButton("formatBlock:blockquote", "“", "Quote")}
+        <span class="giya-rte-sep" aria-hidden="true"></span>
+        ${toolbarButton("createLink", "\uD83D\uDD17", "Link")}
+        <button type="button" data-cmd="image" class="giya-rte-btn" title="Upload image" aria-label="Upload image">${ICONS.image}</button>
+      </div>
+      <div
+        data-rte-editor
+        class="giya-rte-editor"
+        contenteditable="true"
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder="${opts.placeholder || "Comment here…"}"
+      ></div>
+      <input data-rte-file type="file" accept="image/*" class="hidden" hidden />
+    </div>
+  `;
+    const editor = host.querySelector("[data-rte-editor]");
+    const fileInput = host.querySelector("[data-rte-file]");
+    const toolbar = host.querySelector(".giya-rte-toolbar");
+    const run = (command, value) => {
+      editor.focus();
+      try {
+        document.execCommand(command, false, value);
+      } catch {}
+    };
+    toolbar.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    toolbar.addEventListener("click", (event) => {
+      const btn = event.target?.closest("[data-cmd]");
+      if (!btn)
+        return;
+      const cmd = btn.dataset.cmd || "";
+      if (cmd === "createLink") {
+        const url = window.prompt("Link URL", "https://");
+        if (url)
+          run("createLink", url.trim());
+        return;
+      }
+      if (cmd === "image") {
+        fileInput.click();
+        return;
+      }
+      if (cmd.startsWith("formatBlock:")) {
+        run("formatBlock", cmd.split(":")[1] || "p");
+        return;
+      }
+      run(cmd);
+    });
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = "";
+      if (!file)
+        return;
+      (async () => {
+        opts.onStatus?.("Uploading image to Livro…");
+        const result = await uploadErpFile({
+          file,
+          doctype: opts.concernName ? "Sprint Backlogs" : undefined,
+          docname: opts.concernName,
+          isPrivate: true
+        });
+        if (!result.ok) {
+          opts.onStatus?.(result.error);
+          return;
+        }
+        editor.focus();
+        const safeUrl = result.fileUrl.replaceAll('"', "");
+        run("insertHTML", `<p><img src="${safeUrl}" alt="${file.name.replaceAll('"', "")}"></p><p><br></p>`);
+        opts.onStatus?.("Image attached.");
+      })();
+    });
+    editor.addEventListener("paste", (event) => {
+      const item = Array.from(event.clipboardData?.items || []).find((i) => i.type.startsWith("image/"));
+      if (!item)
+        return;
+      const file = item.getAsFile();
+      if (!file)
+        return;
+      event.preventDefault();
+      (async () => {
+        opts.onStatus?.("Uploading pasted image…");
+        const result = await uploadErpFile({
+          file,
+          doctype: opts.concernName ? "Sprint Backlogs" : undefined,
+          docname: opts.concernName,
+          isPrivate: true
+        });
+        if (!result.ok) {
+          opts.onStatus?.(result.error);
+          return;
+        }
+        const safeUrl = result.fileUrl.replaceAll('"', "");
+        run("insertHTML", `<p><img src="${safeUrl}" alt="pasted image"></p><p><br></p>`);
+        opts.onStatus?.("Image attached.");
+      })();
+    });
+    return {
+      getHtml: () => sanitizeCommentHtml(editor.innerHTML),
+      setDisabled: (disabled) => {
+        editor.contentEditable = disabled ? "false" : "true";
+        toolbar.querySelectorAll("button").forEach((b) => {
+          b.disabled = disabled;
+        });
+      },
+      clear: () => {
+        editor.innerHTML = "";
+      },
+      focus: () => editor.focus()
+    };
+  }
+  function richEditorHasContent(html) {
+    return !isBlankCommentHtml(html);
+  }
+
   // src/content/widget/panels/comment.ts
   function renderCommentPanel(els, concern, picked, host) {
     const rect = picked.element.getBoundingClientRect();
@@ -551,14 +794,9 @@
             Change element
           </button>
         </div>
-        <textarea
-          data-comment-input
-          rows="3"
-          placeholder="Comment here…"
-          class="w-full resize-none rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm text-neutral-800 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
-        ></textarea>
+        <div data-comment-editor-host></div>
         <div class="flex items-center justify-between gap-2">
-          <p data-comment-status class="text-xs text-neutral-500">Saves to SPB with system specs. Assignees with Giya see the pin.</p>
+          <p data-comment-status class="text-xs text-neutral-500">HTML comment → Livro SPB (images upload like Desk).</p>
           <button
             type="button"
             data-comment-submit
@@ -571,8 +809,16 @@
       </div>
     `;
     const submitBtn = els.panelBody.querySelector("[data-comment-submit]");
-    const input = els.panelBody.querySelector("[data-comment-input]");
     const status = els.panelBody.querySelector("[data-comment-status]");
+    const editorHost = els.panelBody.querySelector("[data-comment-editor-host]");
+    const editor = editorHost ? mountRichCommentEditor(editorHost, {
+      placeholder: "Write a comment…",
+      concernName: concern.name,
+      onStatus: (message) => {
+        if (status)
+          status.textContent = message;
+      }
+    }) : null;
     els.panelBody.querySelector("[data-change-concern]")?.addEventListener("click", () => {
       host.onChangeConcern();
     });
@@ -582,8 +828,8 @@
     const sendIdle = ICONS.send;
     submitBtn?.addEventListener("click", () => {
       (async () => {
-        const text = input?.value.trim() ?? "";
-        if (!text) {
+        const html = editor?.getHtml() ?? "";
+        if (!richEditorHasContent(html)) {
           if (status)
             status.textContent = "Write something first.";
           return;
@@ -591,32 +837,30 @@
         if (status)
           status.innerHTML = loadingMarkup("Saving to Livro…");
         setButtonBusy(submitBtn, true, sendIdle);
-        if (input)
-          input.disabled = true;
+        editor?.setDisabled(true);
         const result = await addConcernPin(concern.name, {
           v: 1,
           href: location.href,
           selector: picked.selector,
           label: picked.label,
           tagName: picked.tagName,
-          text,
+          text: html,
           envSpecs: collectEnvSpecs()
         });
         if (!result.ok) {
           setButtonBusy(submitBtn, false, sendIdle);
-          if (input)
-            input.disabled = false;
+          editor?.setDisabled(false);
           if (status)
             status.textContent = result.error;
           return;
         }
-        if (input)
-          input.value = "";
+        editor?.clear();
         if (status)
           status.innerHTML = loadingMarkup("Refreshing pins…");
         await host.onSaved();
       })();
     });
+    editor?.focus();
   }
 
   // src/content/widget/panels/concerns.ts
@@ -1115,11 +1359,12 @@
   }
   function showSavedPinPopout(els, item) {
     els.panelTitle.textContent = item.concernName;
+    const body = sanitizeCommentHtml(item.pin.text);
     els.panelBody.innerHTML = `
       <div class="space-y-2">
         <p class="text-xs font-medium text-neutral-900">${escapeHtml(item.concernSubject)}</p>
         <p class="text-xs text-neutral-500">${escapeHtml(item.commentBy)}</p>
-        <p class="rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${escapeHtml(item.pin.text)}</p>
+        <div class="giya-comment-html rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${body}</div>
       </div>
     `;
   }
@@ -1159,8 +1404,8 @@
         aria-label="Giya"
         hidden
       >
-        <button type="button" data-back class="${ICON_BTN_CLASS}" aria-label="Back" title="Back" data-active="false">
-          ${ICONS.back}
+        <button type="button" data-nav class="${ICON_BTN_CLASS}" aria-label="Concerns" title="Concerns" data-active="false" data-mode="concerns">
+          ${ICONS.concerns}
         </button>
         <button type="button" data-env class="${ICON_BTN_CLASS}" aria-label="Environment" title="Environment" data-active="false">
           ${ICONS.environment}
@@ -1178,18 +1423,26 @@
 
       <section
         data-panel
-        class="pointer-events-auto fixed z-4 w-72 max-w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
+        class="pointer-events-auto fixed z-4 flex flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
         role="dialog"
         aria-label="Giya panel"
         hidden
       >
-        <header data-panel-header class="flex cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
+        <header data-panel-header class="flex shrink-0 cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
           <h2 data-panel-title class="flex-1 text-xs font-semibold tracking-tight text-neutral-800"></h2>
           <button type="button" data-close-panel class="${ICON_BTN_CLASS} cursor-pointer" aria-label="Close panel">
             ${ICONS.close}
           </button>
         </header>
-        <div data-panel-body class="max-h-72 overflow-auto px-3 py-3 text-sm"></div>
+        <div data-panel-body class="min-h-0 flex-1 overflow-auto px-3 py-3 text-sm"></div>
+        <div
+          data-panel-resize
+          class="absolute right-0 bottom-0 h-4 w-4 cursor-se-resize touch-none"
+          aria-label="Resize panel"
+          title="Drag to resize"
+        >
+          <span class="pointer-events-none absolute right-1 bottom-1 block h-2 w-2 border-r-2 border-b-2 border-neutral-400/80"></span>
+        </div>
       </section>
 
       <button
@@ -1230,6 +1483,7 @@
     pinViewRect = null;
     drag = null;
     panelDrag = null;
+    panelResize = null;
     suppressClick = false;
     constructor(config) {
       this.config = config;
@@ -1254,12 +1508,13 @@
         panelHeader: requireEl(root, "[data-panel-header]"),
         panelTitle: requireEl(root, "[data-panel-title]"),
         panelBody: requireEl(root, "[data-panel-body]"),
+        panelResize: requireEl(root, "[data-panel-resize]"),
         highlight: requireEl(root, "[data-highlight]"),
         pickHint: requireEl(root, "[data-pick-hint]"),
         pinLayer: requireEl(root, "[data-pin-layer]"),
         fab: requireEl(root, "[data-fab]"),
         fabIcon: requireEl(root, "[data-fab-icon]"),
-        btnBack: requireEl(root, "[data-back]"),
+        btnNav: requireEl(root, "[data-nav]"),
         btnEnv: requireEl(root, "[data-env]"),
         btnUser: requireEl(root, "[data-user]"),
         btnTheme: requireEl(root, "[data-theme]"),
@@ -1287,13 +1542,14 @@
         return;
       els.fab.addEventListener("pointerdown", this.onPointerDown);
       els.fab.addEventListener("click", this.onFabClick, true);
-      els.btnBack.addEventListener("click", () => this.onBackClick());
+      els.btnNav.addEventListener("click", () => this.onNavClick());
       els.btnEnv.addEventListener("click", () => this.togglePanel("environment"));
       els.btnUser.addEventListener("click", () => this.onUserClick());
       els.btnTheme.addEventListener("click", () => this.toggleTheme());
       els.btnPin.addEventListener("click", () => this.togglePin());
-      els.btnClosePanel.addEventListener("click", () => this.onBackClick());
+      els.btnClosePanel.addEventListener("click", () => this.onClosePanelClick());
       els.panelHeader.addEventListener("pointerdown", this.onPanelPointerDown);
+      els.panelResize.addEventListener("pointerdown", this.onPanelResizePointerDown);
       els.backdrop.addEventListener("click", () => {
         if (this.picker.isActive)
           return;
@@ -1573,12 +1829,17 @@
       }
     }
     applySidebarWidth(_width) {}
+    panelSize() {
+      const maxW = Math.max(MIN_PANEL_WIDTH, window.innerWidth - FAB_MARGIN * 2);
+      const maxH = Math.max(MIN_PANEL_HEIGHT, window.innerHeight - FAB_MARGIN * 2);
+      const width = Math.min(maxW, Math.max(MIN_PANEL_WIDTH, this.config.panelWidth || DEFAULT_PANEL_WIDTH));
+      const height = Math.min(maxH, Math.max(MIN_PANEL_HEIGHT, this.config.panelHeight || DEFAULT_PANEL_HEIGHT));
+      return { width, height };
+    }
     clampPanelCoords(coords) {
-      const els = this.els;
-      const panelWidth = Math.min(288, window.innerWidth - FAB_MARGIN * 2);
-      const panelHeight = els?.panel.offsetHeight || 240;
-      const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - panelWidth - FAB_MARGIN);
-      const maxTop = Math.max(FAB_MARGIN, window.innerHeight - panelHeight - FAB_MARGIN);
+      const { width, height } = this.panelSize();
+      const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - width - FAB_MARGIN);
+      const maxTop = Math.max(FAB_MARGIN, window.innerHeight - height - FAB_MARGIN);
       return {
         left: Math.min(maxLeft, Math.max(FAB_MARGIN, coords.left)),
         top: Math.min(maxTop, Math.max(FAB_MARGIN, coords.top))
@@ -1586,8 +1847,8 @@
     }
     defaultPanelCoords() {
       const coords = this.config.fabCoords || defaultCoords(this.config.position);
-      const panelWidth = Math.min(288, window.innerWidth - FAB_MARGIN * 2);
-      let left = coords.left - panelWidth - 12;
+      const { width } = this.panelSize();
+      let left = coords.left - width - 12;
       if (left < FAB_MARGIN)
         left = coords.left + FAB_SIZE + 12;
       return this.clampPanelCoords({ left, top: Math.max(FAB_MARGIN, coords.top - 40) });
@@ -1598,10 +1859,11 @@
         return;
       const next = this.clampPanelCoords(coords);
       this.panelCoords = next;
-      const panelWidth = Math.min(288, window.innerWidth - FAB_MARGIN * 2);
+      const { width, height } = this.panelSize();
       els.panel.style.left = `${next.left}px`;
       els.panel.style.top = `${next.top}px`;
-      els.panel.style.width = `${panelWidth}px`;
+      els.panel.style.width = `${width}px`;
+      els.panel.style.height = `${height}px`;
     }
     layoutChrome() {
       const els = this.els;
@@ -1621,12 +1883,66 @@
       }
       this.applyPanelCoords(this.panelCoords || this.defaultPanelCoords());
     }
+    onPanelResizePointerDown = (event) => {
+      const els = this.els;
+      if (!els || event.button !== 0)
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      const { width, height } = this.panelSize();
+      this.panelResize = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originW: width,
+        originH: height
+      };
+      els.panelResize.setPointerCapture(event.pointerId);
+      els.panelResize.addEventListener("pointermove", this.onPanelResizePointerMove);
+      els.panelResize.addEventListener("pointerup", this.onPanelResizePointerUp);
+      els.panelResize.addEventListener("pointercancel", this.onPanelResizePointerUp);
+      els.panel.classList.remove("transition", "duration-200", "ease-out");
+    };
+    onPanelResizePointerMove = (event) => {
+      const els = this.els;
+      if (!els || !this.panelResize || event.pointerId !== this.panelResize.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      const maxW = Math.max(MIN_PANEL_WIDTH, window.innerWidth - FAB_MARGIN * 2);
+      const maxH = Math.max(MIN_PANEL_HEIGHT, window.innerHeight - FAB_MARGIN * 2);
+      const width = Math.min(maxW, Math.max(MIN_PANEL_WIDTH, this.panelResize.originW + (event.clientX - this.panelResize.startX)));
+      const height = Math.min(maxH, Math.max(MIN_PANEL_HEIGHT, this.panelResize.originH + (event.clientY - this.panelResize.startY)));
+      this.config.panelWidth = width;
+      this.config.panelHeight = height;
+      this.applyPanelCoords(this.panelCoords || this.defaultPanelCoords());
+    };
+    onPanelResizePointerUp = (event) => {
+      const els = this.els;
+      if (!els || !this.panelResize || event.pointerId !== this.panelResize.pointerId) {
+        return;
+      }
+      els.panelResize.removeEventListener("pointermove", this.onPanelResizePointerMove);
+      els.panelResize.removeEventListener("pointerup", this.onPanelResizePointerUp);
+      els.panelResize.removeEventListener("pointercancel", this.onPanelResizePointerUp);
+      try {
+        els.panelResize.releasePointerCapture(event.pointerId);
+      } catch {}
+      els.panel.classList.add("transition", "duration-200", "ease-out");
+      chrome.storage.sync.set({
+        panelWidth: this.config.panelWidth,
+        panelHeight: this.config.panelHeight
+      });
+      this.panelResize = null;
+    };
     onPanelPointerDown = (event) => {
       const els = this.els;
       if (!els || event.button !== 0)
         return;
       const target = event.target;
       if (target?.closest("[data-close-panel]"))
+        return;
+      if (target?.closest("[data-panel-resize]"))
         return;
       if (this.anchorCommentToPick && this.activePanel === "comment")
         return;
@@ -1740,6 +2056,31 @@
         document.removeEventListener("keydown", this.onKeyDown);
       }
     }
+    navIsBackMode() {
+      return this.picker.isActive || this.activePanel === "comment" || this.activePanel === "new-task" || this.activePanel === "pin";
+    }
+    onNavClick() {
+      if (this.navIsBackMode()) {
+        this.onBackClick();
+        return;
+      }
+      (async () => {
+        if (!await this.requireSession())
+          return;
+        if (this.activePanel === "concerns") {
+          this.setPanel(null);
+          return;
+        }
+        this.setPanel("concerns");
+      })();
+    }
+    onClosePanelClick() {
+      if (this.navIsBackMode()) {
+        this.onBackClick();
+        return;
+      }
+      this.setPanel(null);
+    }
     onBackClick() {
       if (this.picker.isActive) {
         this.stopPicker();
@@ -1768,7 +2109,7 @@
         this.setPanel("concerns");
         return;
       }
-      this.setOpen(false);
+      this.setPanel(null);
     }
     onUserClick() {
       (async () => {
@@ -1894,7 +2235,12 @@
       const els = this.els;
       if (!els)
         return;
-      els.btnBack.dataset.active = String(this.activePanel === "comment" || this.activePanel === "concerns" || this.activePanel === "new-task" || this.picker.isActive);
+      const backMode = this.navIsBackMode();
+      els.btnNav.dataset.mode = backMode ? "back" : "concerns";
+      els.btnNav.innerHTML = backMode ? ICONS.back : ICONS.concerns;
+      els.btnNav.title = backMode ? "Back" : "Concerns";
+      els.btnNav.setAttribute("aria-label", backMode ? "Back" : "Concerns");
+      els.btnNav.dataset.active = String(backMode || this.activePanel === "concerns");
       els.btnEnv.dataset.active = String(this.activePanel === "environment");
       els.btnUser.dataset.active = String(this.activePanel === "profile");
     }
@@ -2152,19 +2498,19 @@
       const els = this.els;
       if (!els)
         return;
-      const panelWidth = Math.min(300, window.innerWidth - FAB_MARGIN * 2);
+      const { width, height } = this.panelSize();
       let left = rect.left + 28;
       let top = rect.top + 12;
-      if (left + panelWidth > window.innerWidth - FAB_MARGIN) {
-        left = Math.max(FAB_MARGIN, rect.left - panelWidth - 12);
+      if (left + width > window.innerWidth - FAB_MARGIN) {
+        left = Math.max(FAB_MARGIN, rect.left - width - 12);
       }
-      const panelHeight = els.panel.offsetHeight || 260;
-      if (top + panelHeight > window.innerHeight - FAB_MARGIN) {
-        top = Math.max(FAB_MARGIN, window.innerHeight - panelHeight - FAB_MARGIN);
+      if (top + height > window.innerHeight - FAB_MARGIN) {
+        top = Math.max(FAB_MARGIN, window.innerHeight - height - FAB_MARGIN);
       }
       els.panel.style.left = `${left}px`;
       els.panel.style.top = `${top}px`;
-      els.panel.style.width = `${panelWidth}px`;
+      els.panel.style.width = `${width}px`;
+      els.panel.style.height = `${height}px`;
     }
     togglePin() {
       (async () => {
@@ -2230,6 +2576,17 @@
       if (changes.sidebarWidth) {
         this.applySidebarWidth(Number(changes.sidebarWidth.newValue));
       }
+      if (changes.panelWidth || changes.panelHeight) {
+        if (changes.panelWidth) {
+          this.config.panelWidth = Math.max(MIN_PANEL_WIDTH, Number(changes.panelWidth.newValue) || DEFAULT_PANEL_WIDTH);
+        }
+        if (changes.panelHeight) {
+          this.config.panelHeight = Math.max(MIN_PANEL_HEIGHT, Number(changes.panelHeight.newValue) || DEFAULT_PANEL_HEIGHT);
+        }
+        if (this.activePanel) {
+          this.applyPanelCoords(this.panelCoords || this.defaultPanelCoords());
+        }
+      }
       if (changes.theme) {
         const value = changes.theme.newValue;
         this.applyTheme(value === "light" ? "light" : "dark");
@@ -2287,5 +2644,5 @@
   }
 })();
 
-//# debugId=EBF123361F6E1ED864756E2164756E21
+//# debugId=D2A4DCF80103CB7464756E2164756E21
 //# sourceMappingURL=widget.js.map

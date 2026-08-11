@@ -1,4 +1,8 @@
 import type { GiyaPinPayload } from "../../../entities/concern.type";
+import {
+  commentHtmlToPlainText,
+  sanitizeCommentHtml,
+} from "./sanitize_comment_html.usecase";
 
 const MARKER = "data-giya-pin";
 
@@ -33,14 +37,23 @@ function buildEnvSpecsHtml(specs: NonNullable<GiyaPinPayload["envSpecs"]>): stri
   );
 }
 
-/** Embed pin metadata in SPB timeline Comment HTML. */
+/** Embed pin metadata in SPB timeline Comment HTML (Frappe text/html). */
 export function buildGiyaPinCommentHtml(pin: GiyaPinPayload): string {
-  const payload = escapeAttr(JSON.stringify(pin));
+  const bodyHtml = sanitizeCommentHtml(pin.text);
+  const plain = commentHtmlToPlainText(bodyHtml) || pin.label;
+  const payload = escapeAttr(
+    JSON.stringify({
+      ...pin,
+      text: bodyHtml,
+    })
+  );
   const specsHtml = pin.envSpecs?.length ? buildEnvSpecsHtml(pin.envSpecs) : "";
   return (
     `<div ${MARKER}="1" data-giya-json="${payload}">` +
-    `<p>${escapeHtml(pin.text)}</p>` +
-    `<p><small>Giya pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a></small></p>` +
+    `<div class="giya-comment-body">${bodyHtml}</div>` +
+    `<p><small>Giya pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a>` +
+    (plain ? ` · ${escapeHtml(plain.slice(0, 80))}` : "") +
+    `</small></p>` +
     specsHtml +
     `</div>`
   );
@@ -60,7 +73,10 @@ export function parseGiyaPinFromCommentHtml(content: string): GiyaPinPayload | n
       .replaceAll("&gt;", ">");
     const parsed = JSON.parse(decoded) as GiyaPinPayload;
     if (parsed?.v !== 1 || !parsed.href || !parsed.selector || !parsed.text) return null;
-    return parsed;
+    return {
+      ...parsed,
+      text: sanitizeCommentHtml(parsed.text),
+    };
   } catch {
     return null;
   }

@@ -29,8 +29,8 @@ export function widgetShellHtml(): string {
         aria-label="Giya"
         hidden
       >
-        <button type="button" data-back class="${ICON_BTN_CLASS}" aria-label="Back" title="Back" data-active="false">
-          ${ICONS.back}
+        <button type="button" data-nav class="${ICON_BTN_CLASS}" aria-label="Concerns" title="Concerns" data-active="false" data-mode="concerns">
+          ${ICONS.concerns}
         </button>
         <button type="button" data-env class="${ICON_BTN_CLASS}" aria-label="Environment" title="Environment" data-active="false">
           ${ICONS.environment}
@@ -48,18 +48,26 @@ export function widgetShellHtml(): string {
 
       <section
         data-panel
-        class="pointer-events-auto fixed z-4 w-72 max-w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
+        class="pointer-events-auto fixed z-4 flex flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
         role="dialog"
         aria-label="Giya panel"
         hidden
       >
-        <header data-panel-header class="flex cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
+        <header data-panel-header class="flex shrink-0 cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
           <h2 data-panel-title class="flex-1 text-xs font-semibold tracking-tight text-neutral-800"></h2>
           <button type="button" data-close-panel class="${ICON_BTN_CLASS} cursor-pointer" aria-label="Close panel">
             ${ICONS.close}
           </button>
         </header>
-        <div data-panel-body class="max-h-72 overflow-auto px-3 py-3 text-sm"></div>
+        <div data-panel-body class="min-h-0 flex-1 overflow-auto px-3 py-3 text-sm"></div>
+        <div
+          data-panel-resize
+          class="absolute right-0 bottom-0 h-4 w-4 cursor-se-resize touch-none"
+          aria-label="Resize panel"
+          title="Drag to resize"
+        >
+          <span class="pointer-events-none absolute right-1 bottom-1 block h-2 w-2 border-r-2 border-b-2 border-neutral-400/80"></span>
+        </div>
       </section>
 
       <button

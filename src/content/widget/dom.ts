@@ -1,9 +1,13 @@
 import { ICONS } from "../icons.ts";
 import {
+  DEFAULT_PANEL_HEIGHT,
+  DEFAULT_PANEL_WIDTH,
   DEFAULT_POSITION,
   DEFAULT_SIDEBAR_WIDTH,
   FAB_MARGIN,
   FAB_SIZE,
+  MIN_PANEL_HEIGHT,
+  MIN_PANEL_WIDTH,
   STORAGE_DEFAULTS,
   defaultIconUrl,
 } from "../../shared/defaults.ts";
@@ -55,6 +59,15 @@ export async function loadConfig(): Promise<WidgetConfig> {
       ? (stored.theme as GiyaTheme)
       : "dark";
 
+  const panelWidth = Math.max(
+    MIN_PANEL_WIDTH,
+    Number(stored.panelWidth) || DEFAULT_PANEL_WIDTH
+  );
+  const panelHeight = Math.max(
+    MIN_PANEL_HEIGHT,
+    Number(stored.panelHeight) || DEFAULT_PANEL_HEIGHT
+  );
+
   return {
     iconUrl: stored.iconUrl || defaultIconUrl(),
     position: (stored.position as FabPosition) || DEFAULT_POSITION,
@@ -65,6 +78,8 @@ export async function loadConfig(): Promise<WidgetConfig> {
         : null,
     pinned: Boolean(stored.pinned),
     theme,
+    panelWidth,
+    panelHeight,
   };
 }
 

@@ -62,3 +62,41 @@ export async function addConcernPin(
   }
   return { ok: false, error: "Reload this page — Giya was updated." };
 }
+
+export async function uploadErpFile(input: {
+  file: File;
+  doctype?: string;
+  docname?: string;
+  isPrivate?: boolean;
+}): Promise<{ ok: true; fileUrl: string; fileName: string } | { ok: false; error: string }> {
+  const maxBytes = 4 * 1024 * 1024;
+  if (input.file.size > maxBytes) {
+    return { ok: false, error: "Image too large (max 4 MB)." };
+  }
+
+  const buffer = await input.file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+
+  const response = await sendRuntimeMessage({
+    type: "UPLOAD_ERP_FILE",
+    filename: input.file.name || "image.png",
+    mimeType: input.file.type || "application/octet-stream",
+    base64: btoa(binary),
+    doctype: input.doctype,
+    docname: input.docname,
+    isPrivate: input.isPrivate,
+  });
+
+  if (response?.type === "ERP_FILE") {
+    if (response.ok) {
+      return { ok: true, fileUrl: response.fileUrl, fileName: response.fileName };
+    }
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Giya was updated." };
+}

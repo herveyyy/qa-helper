@@ -4,6 +4,10 @@ import type { PickedElement } from "../../element-picker.ts";
 import { collectEnvSpecs } from "../../env-specs.ts";
 import { ICONS } from "../../icons.ts";
 import { escapeHtml, loadingMarkup, setButtonBusy } from "../dom.ts";
+import {
+  mountRichCommentEditor,
+  richEditorHasContent,
+} from "../rich-editor.ts";
 import type { WidgetElements } from "../types.ts";
 
 export type CommentPanelHost = {
@@ -41,14 +45,9 @@ export function renderCommentPanel(
             Change element
           </button>
         </div>
-        <textarea
-          data-comment-input
-          rows="3"
-          placeholder="Comment here…"
-          class="w-full resize-none rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm text-neutral-800 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
-        ></textarea>
+        <div data-comment-editor-host></div>
         <div class="flex items-center justify-between gap-2">
-          <p data-comment-status class="text-xs text-neutral-500">Saves to SPB with system specs. Assignees with Giya see the pin.</p>
+          <p data-comment-status class="text-xs text-neutral-500">HTML comment → Livro SPB (images upload like Desk).</p>
           <button
             type="button"
             data-comment-submit
@@ -64,10 +63,20 @@ export function renderCommentPanel(
   const submitBtn = els.panelBody.querySelector(
     "[data-comment-submit]"
   ) as HTMLButtonElement | null;
-  const input = els.panelBody.querySelector(
-    "[data-comment-input]"
-  ) as HTMLTextAreaElement | null;
   const status = els.panelBody.querySelector("[data-comment-status]");
+  const editorHost = els.panelBody.querySelector(
+    "[data-comment-editor-host]"
+  ) as HTMLElement | null;
+
+  const editor = editorHost
+    ? mountRichCommentEditor(editorHost, {
+        placeholder: "Write a comment…",
+        concernName: concern.name,
+        onStatus: (message) => {
+          if (status) status.textContent = message;
+        },
+      })
+    : null;
 
   els.panelBody.querySelector("[data-change-concern]")?.addEventListener("click", () => {
     host.onChangeConcern();
@@ -80,14 +89,14 @@ export function renderCommentPanel(
   const sendIdle = ICONS.send;
   submitBtn?.addEventListener("click", () => {
     void (async () => {
-      const text = input?.value.trim() ?? "";
-      if (!text) {
+      const html = editor?.getHtml() ?? "";
+      if (!richEditorHasContent(html)) {
         if (status) status.textContent = "Write something first.";
         return;
       }
       if (status) status.innerHTML = loadingMarkup("Saving to Livro…");
       setButtonBusy(submitBtn, true, sendIdle);
-      if (input) input.disabled = true;
+      editor?.setDisabled(true);
 
       const result = await addConcernPin(concern.name, {
         v: 1,
@@ -95,20 +104,22 @@ export function renderCommentPanel(
         selector: picked.selector,
         label: picked.label,
         tagName: picked.tagName,
-        text,
+        text: html,
         envSpecs: collectEnvSpecs(),
       });
 
       if (!result.ok) {
         setButtonBusy(submitBtn, false, sendIdle);
-        if (input) input.disabled = false;
+        editor?.setDisabled(false);
         if (status) status.textContent = result.error;
         return;
       }
 
-      if (input) input.value = "";
+      editor?.clear();
       if (status) status.innerHTML = loadingMarkup("Refreshing pins…");
       await host.onSaved();
     })();
   });
+
+  editor?.focus();
 }

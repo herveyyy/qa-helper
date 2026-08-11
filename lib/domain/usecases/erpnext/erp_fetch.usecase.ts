@@ -55,6 +55,11 @@ export async function erpFetch(
     if (csrf) {
       headers["X-Frappe-CSRF-Token"] = csrf;
     }
+    // Let the browser set multipart boundary for FormData uploads.
+    if (init.body instanceof FormData) {
+      delete headers["Content-Type"];
+      delete headers["content-type"];
+    }
 
     return await fetch(url, {
       ...init,

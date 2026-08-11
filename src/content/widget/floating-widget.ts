@@ -7,11 +7,15 @@ import { ElementPicker, type PickedElement } from "../element-picker.ts";
 import { ICONS } from "../icons.ts";
 import { avatarFallbackUrl } from "../../shared/avatar.ts";
 import {
+  DEFAULT_PANEL_HEIGHT,
+  DEFAULT_PANEL_WIDTH,
   DEFAULT_POSITION,
   DOCK_WIDTH,
   DRAG_THRESHOLD_PX,
   FAB_MARGIN,
   FAB_SIZE,
+  MIN_PANEL_HEIGHT,
+  MIN_PANEL_WIDTH,
   defaultIconUrl,
 } from "../../shared/defaults.ts";
 import type {
@@ -89,6 +93,15 @@ export class FloatingWidget {
       moved: boolean;
     }
     | null = null;
+  private panelResize:
+    | {
+      pointerId: number;
+      startX: number;
+      startY: number;
+      originW: number;
+      originH: number;
+    }
+    | null = null;
   private suppressClick = false;
 
   constructor(config: WidgetConfig) {
@@ -118,12 +131,13 @@ export class FloatingWidget {
       panelHeader: requireEl<HTMLElement>(root, "[data-panel-header]"),
       panelTitle: requireEl<HTMLElement>(root, "[data-panel-title]"),
       panelBody: requireEl<HTMLElement>(root, "[data-panel-body]"),
+      panelResize: requireEl<HTMLDivElement>(root, "[data-panel-resize]"),
       highlight: requireEl<HTMLDivElement>(root, "[data-highlight]"),
       pickHint: requireEl<HTMLDivElement>(root, "[data-pick-hint]"),
       pinLayer: requireEl<HTMLDivElement>(root, "[data-pin-layer]"),
       fab: requireEl<HTMLButtonElement>(root, "[data-fab]"),
       fabIcon: requireEl<HTMLImageElement>(root, "[data-fab-icon]"),
-      btnBack: requireEl<HTMLButtonElement>(root, "[data-back]"),
+      btnNav: requireEl<HTMLButtonElement>(root, "[data-nav]"),
       btnEnv: requireEl<HTMLButtonElement>(root, "[data-env]"),
       btnUser: requireEl<HTMLButtonElement>(root, "[data-user]"),
       btnTheme: requireEl<HTMLButtonElement>(root, "[data-theme]"),
@@ -157,13 +171,14 @@ export class FloatingWidget {
 
     els.fab.addEventListener("pointerdown", this.onPointerDown);
     els.fab.addEventListener("click", this.onFabClick, true);
-    els.btnBack.addEventListener("click", () => this.onBackClick());
+    els.btnNav.addEventListener("click", () => this.onNavClick());
     els.btnEnv.addEventListener("click", () => this.togglePanel("environment"));
     els.btnUser.addEventListener("click", () => this.onUserClick());
     els.btnTheme.addEventListener("click", () => this.toggleTheme());
     els.btnPin.addEventListener("click", () => this.togglePin());
-    els.btnClosePanel.addEventListener("click", () => this.onBackClick());
+    els.btnClosePanel.addEventListener("click", () => this.onClosePanelClick());
     els.panelHeader.addEventListener("pointerdown", this.onPanelPointerDown);
+    els.panelResize.addEventListener("pointerdown", this.onPanelResizePointerDown);
     els.backdrop.addEventListener("click", () => {
       if (this.picker.isActive) return;
       if (this.config.pinned && this.session) {
@@ -476,12 +491,24 @@ export class FloatingWidget {
     // Kept for storage sync compatibility; glass dock is fixed-width.
   }
 
+  private panelSize(): { width: number; height: number } {
+    const maxW = Math.max(MIN_PANEL_WIDTH, window.innerWidth - FAB_MARGIN * 2);
+    const maxH = Math.max(MIN_PANEL_HEIGHT, window.innerHeight - FAB_MARGIN * 2);
+    const width = Math.min(
+      maxW,
+      Math.max(MIN_PANEL_WIDTH, this.config.panelWidth || DEFAULT_PANEL_WIDTH)
+    );
+    const height = Math.min(
+      maxH,
+      Math.max(MIN_PANEL_HEIGHT, this.config.panelHeight || DEFAULT_PANEL_HEIGHT)
+    );
+    return { width, height };
+  }
+
   private clampPanelCoords(coords: FabCoords): FabCoords {
-    const els = this.els;
-    const panelWidth = Math.min(288, window.innerWidth - FAB_MARGIN * 2);
-    const panelHeight = els?.panel.offsetHeight || 240;
-    const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - panelWidth - FAB_MARGIN);
-    const maxTop = Math.max(FAB_MARGIN, window.innerHeight - panelHeight - FAB_MARGIN);
+    const { width, height } = this.panelSize();
+    const maxLeft = Math.max(FAB_MARGIN, window.innerWidth - width - FAB_MARGIN);
+    const maxTop = Math.max(FAB_MARGIN, window.innerHeight - height - FAB_MARGIN);
     return {
       left: Math.min(maxLeft, Math.max(FAB_MARGIN, coords.left)),
       top: Math.min(maxTop, Math.max(FAB_MARGIN, coords.top)),
@@ -490,8 +517,8 @@ export class FloatingWidget {
 
   private defaultPanelCoords(): FabCoords {
     const coords = this.config.fabCoords || defaultCoords(this.config.position);
-    const panelWidth = Math.min(288, window.innerWidth - FAB_MARGIN * 2);
-    let left = coords.left - panelWidth - 12;
+    const { width } = this.panelSize();
+    let left = coords.left - width - 12;
     if (left < FAB_MARGIN) left = coords.left + FAB_SIZE + 12;
     return this.clampPanelCoords({ left, top: Math.max(FAB_MARGIN, coords.top - 40) });
   }
@@ -501,10 +528,11 @@ export class FloatingWidget {
     if (!els) return;
     const next = this.clampPanelCoords(coords);
     this.panelCoords = next;
-    const panelWidth = Math.min(288, window.innerWidth - FAB_MARGIN * 2);
+    const { width, height } = this.panelSize();
     els.panel.style.left = `${next.left}px`;
     els.panel.style.top = `${next.top}px`;
-    els.panel.style.width = `${panelWidth}px`;
+    els.panel.style.width = `${width}px`;
+    els.panel.style.height = `${height}px`;
   }
 
   private layoutChrome(): void {
@@ -531,11 +559,77 @@ export class FloatingWidget {
     this.applyPanelCoords(this.panelCoords || this.defaultPanelCoords());
   }
 
+  private onPanelResizePointerDown = (event: PointerEvent): void => {
+    const els = this.els;
+    if (!els || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const { width, height } = this.panelSize();
+    this.panelResize = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originW: width,
+      originH: height,
+    };
+    els.panelResize.setPointerCapture(event.pointerId);
+    els.panelResize.addEventListener("pointermove", this.onPanelResizePointerMove);
+    els.panelResize.addEventListener("pointerup", this.onPanelResizePointerUp);
+    els.panelResize.addEventListener("pointercancel", this.onPanelResizePointerUp);
+    els.panel.classList.remove("transition", "duration-200", "ease-out");
+  };
+
+  private onPanelResizePointerMove = (event: PointerEvent): void => {
+    const els = this.els;
+    if (!els || !this.panelResize || event.pointerId !== this.panelResize.pointerId) {
+      return;
+    }
+    event.preventDefault();
+    const maxW = Math.max(MIN_PANEL_WIDTH, window.innerWidth - FAB_MARGIN * 2);
+    const maxH = Math.max(MIN_PANEL_HEIGHT, window.innerHeight - FAB_MARGIN * 2);
+    const width = Math.min(
+      maxW,
+      Math.max(MIN_PANEL_WIDTH, this.panelResize.originW + (event.clientX - this.panelResize.startX))
+    );
+    const height = Math.min(
+      maxH,
+      Math.max(
+        MIN_PANEL_HEIGHT,
+        this.panelResize.originH + (event.clientY - this.panelResize.startY)
+      )
+    );
+    this.config.panelWidth = width;
+    this.config.panelHeight = height;
+    this.applyPanelCoords(this.panelCoords || this.defaultPanelCoords());
+  };
+
+  private onPanelResizePointerUp = (event: PointerEvent): void => {
+    const els = this.els;
+    if (!els || !this.panelResize || event.pointerId !== this.panelResize.pointerId) {
+      return;
+    }
+    els.panelResize.removeEventListener("pointermove", this.onPanelResizePointerMove);
+    els.panelResize.removeEventListener("pointerup", this.onPanelResizePointerUp);
+    els.panelResize.removeEventListener("pointercancel", this.onPanelResizePointerUp);
+    try {
+      els.panelResize.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+    els.panel.classList.add("transition", "duration-200", "ease-out");
+    void chrome.storage.sync.set({
+      panelWidth: this.config.panelWidth,
+      panelHeight: this.config.panelHeight,
+    });
+    this.panelResize = null;
+  };
+
   private onPanelPointerDown = (event: PointerEvent): void => {
     const els = this.els;
     if (!els || event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest("[data-close-panel]")) return;
+    if (target?.closest("[data-panel-resize]")) return;
     if (this.anchorCommentToPick && this.activePanel === "comment") return;
 
     const rect = els.panel.getBoundingClientRect();
@@ -659,6 +753,39 @@ export class FloatingWidget {
     }
   }
 
+  /** Nested flows use back; top-level menus use Concerns icon. */
+  private navIsBackMode(): boolean {
+    return (
+      this.picker.isActive ||
+      this.activePanel === "comment" ||
+      this.activePanel === "new-task" ||
+      this.activePanel === "pin"
+    );
+  }
+
+  private onNavClick(): void {
+    if (this.navIsBackMode()) {
+      this.onBackClick();
+      return;
+    }
+    void (async () => {
+      if (!(await this.requireSession())) return;
+      if (this.activePanel === "concerns") {
+        this.setPanel(null);
+        return;
+      }
+      this.setPanel("concerns");
+    })();
+  }
+
+  private onClosePanelClick(): void {
+    if (this.navIsBackMode()) {
+      this.onBackClick();
+      return;
+    }
+    this.setPanel(null);
+  }
+
   private onBackClick(): void {
     if (this.picker.isActive) {
       this.stopPicker();
@@ -692,7 +819,7 @@ export class FloatingWidget {
       return;
     }
 
-    this.setOpen(false);
+    this.setPanel(null);
   }
 
   private onUserClick(): void {
@@ -821,12 +948,16 @@ export class FloatingWidget {
   private syncDockActive(): void {
     const els = this.els;
     if (!els) return;
-    els.btnBack.dataset.active = String(
-      this.activePanel === "comment" ||
-      this.activePanel === "concerns" ||
-      this.activePanel === "new-task" ||
-      this.picker.isActive
+
+    const backMode = this.navIsBackMode();
+    els.btnNav.dataset.mode = backMode ? "back" : "concerns";
+    els.btnNav.innerHTML = backMode ? ICONS.back : ICONS.concerns;
+    els.btnNav.title = backMode ? "Back" : "Concerns";
+    els.btnNav.setAttribute("aria-label", backMode ? "Back" : "Concerns");
+    els.btnNav.dataset.active = String(
+      backMode || this.activePanel === "concerns"
     );
+
     els.btnEnv.dataset.active = String(this.activePanel === "environment");
     els.btnUser.dataset.active = String(this.activePanel === "profile");
   }
@@ -1096,21 +1227,21 @@ export class FloatingWidget {
     const els = this.els;
     if (!els) return;
 
-    const panelWidth = Math.min(300, window.innerWidth - FAB_MARGIN * 2);
+    const { width, height } = this.panelSize();
     let left = rect.left + 28;
     let top = rect.top + 12;
 
-    if (left + panelWidth > window.innerWidth - FAB_MARGIN) {
-      left = Math.max(FAB_MARGIN, rect.left - panelWidth - 12);
+    if (left + width > window.innerWidth - FAB_MARGIN) {
+      left = Math.max(FAB_MARGIN, rect.left - width - 12);
     }
-    const panelHeight = els.panel.offsetHeight || 260;
-    if (top + panelHeight > window.innerHeight - FAB_MARGIN) {
-      top = Math.max(FAB_MARGIN, window.innerHeight - panelHeight - FAB_MARGIN);
+    if (top + height > window.innerHeight - FAB_MARGIN) {
+      top = Math.max(FAB_MARGIN, window.innerHeight - height - FAB_MARGIN);
     }
 
     els.panel.style.left = `${left}px`;
     els.panel.style.top = `${top}px`;
-    els.panel.style.width = `${panelWidth}px`;
+    els.panel.style.width = `${width}px`;
+    els.panel.style.height = `${height}px`;
   }
 
   private togglePin(): void {
@@ -1185,6 +1316,23 @@ export class FloatingWidget {
     }
     if (changes.sidebarWidth) {
       this.applySidebarWidth(Number(changes.sidebarWidth.newValue));
+    }
+    if (changes.panelWidth || changes.panelHeight) {
+      if (changes.panelWidth) {
+        this.config.panelWidth = Math.max(
+          MIN_PANEL_WIDTH,
+          Number(changes.panelWidth.newValue) || DEFAULT_PANEL_WIDTH
+        );
+      }
+      if (changes.panelHeight) {
+        this.config.panelHeight = Math.max(
+          MIN_PANEL_HEIGHT,
+          Number(changes.panelHeight.newValue) || DEFAULT_PANEL_HEIGHT
+        );
+      }
+      if (this.activePanel) {
+        this.applyPanelCoords(this.panelCoords || this.defaultPanelCoords());
+      }
     }
     if (changes.theme) {
       const value = changes.theme.newValue;
