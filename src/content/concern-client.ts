@@ -5,10 +5,10 @@ import type {
 } from "../../lib/entities/concern.type";
 import { sendRuntimeMessage } from "../shared/runtime_message.ts";
 
-export async function listConcerns(): Promise<
+export async function listConcerns(force = false): Promise<
   { ok: true; concerns: Concern[] } | { ok: false; error: string }
 > {
-  const response = await sendRuntimeMessage({ type: "LIST_CONCERNS" });
+  const response = await sendRuntimeMessage({ type: "LIST_CONCERNS", force });
   if (response?.type === "CONCERNS") {
     if (response.ok) return { ok: true, concerns: response.concerns };
     return { ok: false, error: response.error };

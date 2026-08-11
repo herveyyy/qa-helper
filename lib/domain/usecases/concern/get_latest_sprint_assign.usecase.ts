@@ -72,21 +72,18 @@ async function fetchSpbSprintAssigns(
   filters: unknown[]
 ): Promise<{ ok: true; data: string[] } | { ok: false; error: string }> {
   try {
-    const body: Record<string, unknown> = {
+    const params = new URLSearchParams({
       doctype: "Sprint Backlogs",
-      fields: ["sprint_assign", "modified"],
+      fields: JSON.stringify(["sprint_assign", "modified"]),
       order_by: "modified desc",
-      limit_page_length: 50,
-    };
-    if (filters.length) body.filters = filters;
+      limit_page_length: "50",
+    });
+    if (filters.length) params.set("filters", JSON.stringify(filters));
 
+    // GET avoids CSRFTokenError from extension POSTs.
     const res = await erpFetch(
-      `${baseUrl}/api/method/frappe.client.get_list`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
+      `${baseUrl}/api/method/frappe.client.get_list?${params}`,
+      { method: "GET" },
       15_000
     );
 

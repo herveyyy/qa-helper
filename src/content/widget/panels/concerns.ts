@@ -14,15 +14,18 @@ export type ConcernsPanelHost = {
 
 export async function renderConcernsPanel(
   els: WidgetElements,
-  host: ConcernsPanelHost
+  host: ConcernsPanelHost,
+  options: { force?: boolean } = {}
 ): Promise<void> {
   host.markConcernsActive();
   host.syncDockActive();
   els.panelTitle.textContent = "Concerns";
-  els.panelBody.innerHTML = loadingMarkup("Loading concerns…");
+  els.panelBody.innerHTML = loadingMarkup(
+    options.force ? "Refreshing concerns…" : "Loading concerns…"
+  );
   host.showPanelVisual();
 
-  const result = await listConcerns();
+  const result = await listConcerns(Boolean(options.force));
   if (!result.ok) {
     els.panelBody.innerHTML = `
         <div class="space-y-3">
@@ -32,12 +35,13 @@ export async function renderConcernsPanel(
             data-retry-concerns
             class="flex w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
           >
+            ${ICONS.refresh}
             Retry
           </button>
         </div>
       `;
     els.panelBody.querySelector("[data-retry-concerns]")?.addEventListener("click", () => {
-      void renderConcernsPanel(els, host);
+      void renderConcernsPanel(els, host, { force: true });
     });
     return;
   }
@@ -83,18 +87,33 @@ export async function renderConcernsPanel(
   els.panelBody.innerHTML = `
       <div class="mb-3 flex items-center justify-between gap-2">
         <p class="text-xs text-neutral-500">Your open concerns</p>
-        <button
-          type="button"
-          data-new-task
-          class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-neutral-900 text-white transition hover:bg-neutral-800"
-          aria-label="New task"
-          title="New task"
-        >
-          ${ICONS.plus}
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button
+            type="button"
+            data-refresh-concerns
+            class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-white/70 text-neutral-800 transition hover:bg-white"
+            aria-label="Refresh concerns"
+            title="Refresh"
+          >
+            ${ICONS.refresh}
+          </button>
+          <button
+            type="button"
+            data-new-task
+            class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-neutral-900 text-white transition hover:bg-neutral-800"
+            aria-label="New task"
+            title="New task"
+          >
+            ${ICONS.plus}
+          </button>
+        </div>
       </div>
       ${listMarkup}
     `;
+
+  els.panelBody.querySelector("[data-refresh-concerns]")?.addEventListener("click", () => {
+    void renderConcernsPanel(els, host, { force: true });
+  });
 
   els.panelBody.querySelector("[data-new-task]")?.addEventListener("click", () => {
     host.onNewTask();

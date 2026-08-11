@@ -2,7 +2,7 @@ import type { GiyaPinComment } from "../../../lib/entities/concern.type";
 import type { UserProfile } from "../../../lib/entities/user.type";
 import { listPagePins } from "../concern-client.ts";
 import { ICONS } from "../icons.ts";
-import { defaultIconUrl } from "../../shared/defaults.ts";
+import { avatarFallbackUrl } from "../../shared/avatar.ts";
 import { escapeHtml } from "./dom.ts";
 import type { WidgetElements } from "./types.ts";
 
@@ -44,7 +44,8 @@ export function renderDraftPin(els: WidgetElements, rect: DOMRect, avatarUrl: st
   const img = wrap.querySelector("img");
   if (img) {
     img.onerror = () => {
-      img.src = defaultIconUrl();
+      img.onerror = null;
+      img.src = avatarFallbackUrl("?");
     };
   }
   els.pinLayer.appendChild(wrap);
@@ -79,10 +80,11 @@ export function renderSavedPins(
     pin.style.left = `${rect.left}px`;
     pin.style.top = `${Math.max(8, rect.top - 8)}px`;
     pin.title = `${item.concernName}: ${item.pin.text}`;
-    const avatar =
-      item.commentEmail === profile?.email || item.commentEmail === profile?.userName
-        ? avatarUrl
-        : defaultIconUrl();
+    const isMe =
+      item.commentEmail === profile?.email ||
+      item.commentEmail === profile?.userName;
+    const fallback = avatarFallbackUrl(item.commentBy || item.commentEmail);
+    const avatar = isMe ? avatarUrl : fallback;
     pin.innerHTML = `
         <button type="button" class="relative h-8 w-8" aria-label="Open pin comment">
           <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-sky-400" />
@@ -91,11 +93,20 @@ export function renderSavedPins(
     const img = pin.querySelector("img");
     if (img) {
       img.onerror = () => {
-        img.src = defaultIconUrl();
+        img.onerror = null;
+        img.src = fallback;
       };
     }
-    pin.querySelector("button")?.addEventListener("click", () => {
+    const open = (event: Event) => {
+      // Don't let the click hit the page under the pin (links / login / etc).
+      event.preventDefault();
+      event.stopPropagation();
       onOpen(item);
+    };
+    pin.querySelector("button")?.addEventListener("click", open);
+    pin.querySelector("button")?.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
     });
     els.pinLayer.appendChild(pin);
   }

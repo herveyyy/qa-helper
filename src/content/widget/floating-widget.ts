@@ -4,6 +4,7 @@ import type { UserProfile } from "../../../lib/entities/user.type";
 import { fetchSession, fetchUserProfile, peekSid } from "../auth-client.ts";
 import { HOST_ID } from "../constants.ts";
 import { ElementPicker, type PickedElement } from "../element-picker.ts";
+import { avatarFallbackUrl } from "../../shared/avatar.ts";
 import {
   DEFAULT_POSITION,
   DOCK_WIDTH,
@@ -129,7 +130,8 @@ export class FloatingWidget {
     this.bindEvents();
     this.enableKeyShield();
     void this.refreshSession().then((ok) => {
-      if (ok) void this.refreshPagePins(true);
+      // One pin load on boot — never force-loop.
+      if (ok) void this.refreshPagePins(false);
       if (this.config.pinned && this.session) {
         this.setOpen(true);
         this.setPanel("concerns");
@@ -165,15 +167,9 @@ export class FloatingWidget {
       chrome.runtime.onMessage.addListener((message: { type?: string }) => {
         if (!chrome.runtime?.id) return undefined;
         if (message?.type === "AUTH_CHANGED") {
-          // Cookie-based session — no need to force network revalidate.
+          // Fired only when Livro sid is cleared — clear UI, don't refetch storms.
           void this.refreshSession(false).then(async (ok) => {
-            if (ok) {
-              void this.refreshPagePins(true);
-              if (this.activePanel === "login") {
-                this.setPanel("concerns");
-              }
-              return;
-            }
+            if (ok) return;
             this.pagePins = [];
             this.renderSavedPins();
             if (this.open && this.activePanel !== "login") {
@@ -221,7 +217,10 @@ export class FloatingWidget {
   }
 
   private avatarUrl(): string {
-    return this.profile?.userImage || defaultIconUrl();
+    if (this.profile?.userImage) return this.profile.userImage;
+    return avatarFallbackUrl(
+      this.profile?.fullName || this.profile?.email || this.session?.email
+    );
   }
 
   private async requireSession(): Promise<boolean> {
@@ -1016,7 +1015,7 @@ export class FloatingWidget {
       if (els) renderPinLoadingBadge(els, false);
       if (this.pinsReloadQueued || this.pinsHref !== location.href) {
         this.pinsReloadQueued = false;
-        void this.refreshPagePins(true);
+        void this.refreshPagePins(false);
       }
     }
   }

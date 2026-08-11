@@ -49,31 +49,29 @@ export async function listPagePinComments(
   if (names.length === 0) return { ok: true, data: [] };
 
   try {
+    const params = new URLSearchParams({
+      doctype: "Comment",
+      fields: JSON.stringify([
+        "name",
+        "content",
+        "comment_by",
+        "comment_email",
+        "reference_name",
+        "creation",
+      ]),
+      filters: JSON.stringify([
+        ["reference_doctype", "=", "Sprint Backlogs"],
+        ["comment_type", "=", "Comment"],
+        ["reference_name", "in", names],
+        ["content", "like", "%data-giya-pin%"],
+      ]),
+      order_by: "creation desc",
+      limit_page_length: "100",
+    });
+
     const res = await erpFetch(
-      `${site}/api/method/frappe.client.get_list`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Comment",
-          fields: [
-            "name",
-            "content",
-            "comment_by",
-            "comment_email",
-            "reference_name",
-            "creation",
-          ],
-          filters: [
-            ["reference_doctype", "=", "Sprint Backlogs"],
-            ["comment_type", "=", "Comment"],
-            ["reference_name", "in", names],
-            ["content", "like", "%data-giya-pin%"],
-          ],
-          order_by: "creation desc",
-          limit_page_length: 100,
-        }),
-      },
+      `${site}/api/method/frappe.client.get_list?${params}`,
+      { method: "GET" },
       15_000
     );
 

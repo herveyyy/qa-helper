@@ -1,6 +1,6 @@
 import { disconnectErp } from "../../auth-client.ts";
 import type { UserProfile } from "../../../../lib/entities/user.type";
-import { defaultIconUrl } from "../../../shared/defaults.ts";
+import { avatarFallbackUrl } from "../../../shared/avatar.ts";
 import { escapeHtml, loadingMarkup } from "../dom.ts";
 import type { WidgetElements } from "../types.ts";
 
@@ -48,7 +48,8 @@ export async function renderProfilePanel(
   const img = els.panelBody.querySelector("img");
   if (img) {
     img.onerror = () => {
-      img.src = defaultIconUrl();
+      img.onerror = null;
+      img.src = avatarFallbackUrl(profile.fullName || profile.email);
     };
   }
   els.panelBody.querySelector("[data-disconnect]")?.addEventListener("click", () => {

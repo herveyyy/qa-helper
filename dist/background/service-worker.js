@@ -432,25 +432,11 @@
       return null;
     }
   }
-  async function refreshCsrfCookie(site) {
-    try {
-      await fetch(`${site}/api/method/frappe.auth.get_logged_user`, {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-        headers: { Accept: "application/json" }
-      });
-    } catch {}
-    return readCsrfToken(site);
-  }
   async function erpFetch(url, init = {}, timeoutMs = 15000) {
     const site = normalizeErpBaseUrl(url) || ERP_BASE_URL;
     const method = (init.method || "GET").toUpperCase();
     const needsCsrf = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
-    let csrf = needsCsrf ? await readCsrfToken(site) : null;
-    if (needsCsrf && !csrf) {
-      csrf = await refreshCsrfCookie(site);
-    }
+    const csrf = needsCsrf ? await readCsrfToken(site) : null;
     const controller = new AbortController;
     const timer = setTimeout(() => controller.abort("ERP_TIMEOUT"), timeoutMs);
     try {
@@ -459,30 +445,13 @@
       if (csrf) {
         headers["X-Frappe-CSRF-Token"] = csrf;
       }
-      let response = await fetch(url, {
+      return await fetch(url, {
         ...init,
         credentials: "include",
         cache: "no-store",
         signal: controller.signal,
         headers
       });
-      if (needsCsrf && response.status === 400) {
-        const text = await response.clone().text();
-        if (/CSRFTokenError|csrf/i.test(text)) {
-          const next = await refreshCsrfCookie(site);
-          if (next) {
-            headers["X-Frappe-CSRF-Token"] = next;
-            response = await fetch(url, {
-              ...init,
-              credentials: "include",
-              cache: "no-store",
-              signal: controller.signal,
-              headers
-            });
-          }
-        }
-      }
-      return response;
     } finally {
       clearTimeout(timer);
     }
@@ -549,19 +518,15 @@
   }
   async function fetchSpbSprintAssigns(baseUrl, filters) {
     try {
-      const body = {
+      const params = new URLSearchParams({
         doctype: "Sprint Backlogs",
-        fields: ["sprint_assign", "modified"],
+        fields: JSON.stringify(["sprint_assign", "modified"]),
         order_by: "modified desc",
-        limit_page_length: 50
-      };
+        limit_page_length: "50"
+      });
       if (filters.length)
-        body.filters = filters;
-      const res = await erpFetch(`${baseUrl}/api/method/frappe.client.get_list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      }, 15000);
+        params.set("filters", JSON.stringify(filters));
+      const res = await erpFetch(`${baseUrl}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 15000);
       if (!res.ok) {
         return { ok: false, error: await erpHttpError(res, "Sprint Backlogs") };
       }
@@ -913,27 +878,24 @@
     try {
       email = decodeURIComponent(email);
     } catch {}
+    const params = new URLSearchParams({
+      doctype: "Sprint Backlogs",
+      fields: JSON.stringify([
+        "name",
+        "subject",
+        "status",
+        "type",
+        "priority",
+        "sprint_assign",
+        "dev_assignee",
+        "current_assignee"
+      ]),
+      filters: JSON.stringify([["current_assignee", "=", email]]),
+      order_by: "modified desc",
+      limit_page_length: "50"
+    });
     try {
-      const res = await erpFetch(`${site}/api/method/frappe.client.get_list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Sprint Backlogs",
-          fields: [
-            "name",
-            "subject",
-            "status",
-            "type",
-            "priority",
-            "sprint_assign",
-            "dev_assignee",
-            "current_assignee"
-          ],
-          filters: [["current_assignee", "=", email]],
-          order_by: "modified desc",
-          limit_page_length: 50
-        })
-      }, 15000);
+      const res = await erpFetch(`${site}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 15000);
       if (!res.ok) {
         const detail = await readErpError(res);
         return {
@@ -1012,29 +974,26 @@
     if (names.length === 0)
       return { ok: true, data: [] };
     try {
-      const res = await erpFetch(`${site}/api/method/frappe.client.get_list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Comment",
-          fields: [
-            "name",
-            "content",
-            "comment_by",
-            "comment_email",
-            "reference_name",
-            "creation"
-          ],
-          filters: [
-            ["reference_doctype", "=", "Sprint Backlogs"],
-            ["comment_type", "=", "Comment"],
-            ["reference_name", "in", names],
-            ["content", "like", "%data-giya-pin%"]
-          ],
-          order_by: "creation desc",
-          limit_page_length: 100
-        })
-      }, 15000);
+      const params = new URLSearchParams({
+        doctype: "Comment",
+        fields: JSON.stringify([
+          "name",
+          "content",
+          "comment_by",
+          "comment_email",
+          "reference_name",
+          "creation"
+        ]),
+        filters: JSON.stringify([
+          ["reference_doctype", "=", "Sprint Backlogs"],
+          ["comment_type", "=", "Comment"],
+          ["reference_name", "in", names],
+          ["content", "like", "%data-giya-pin%"]
+        ]),
+        order_by: "creation desc",
+        limit_page_length: "100"
+      });
+      const res = await erpFetch(`${site}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 15000);
       if (!res.ok) {
         return { ok: false, error: `Could not load comments (${res.status}).` };
       }
@@ -1073,6 +1032,7 @@
   var PINS_TTL_MS = 30000;
   var concernsCache = null;
   var concernsCacheEmail = null;
+  var concernsInflight = null;
   var pinsCache = new Map;
   function pageKey(email, href) {
     try {
@@ -1095,12 +1055,23 @@
     if (!options.force && concernsCache && concernsCacheEmail === email && Date.now() - concernsCache.at < CONCERNS_TTL_MS) {
       return { ok: true, data: concernsCache.data };
     }
-    const result = await listAssigneeConcerns(baseUrl);
-    if (result.ok) {
-      concernsCache = { at: Date.now(), data: result.data };
-      concernsCacheEmail = email;
+    if (!options.force && concernsInflight)
+      return concernsInflight;
+    const run = (async () => {
+      const result = await listAssigneeConcerns(baseUrl);
+      if (result.ok) {
+        concernsCache = { at: Date.now(), data: result.data };
+        concernsCacheEmail = email;
+      }
+      return result;
+    })();
+    if (!options.force) {
+      concernsInflight = run.finally(() => {
+        concernsInflight = null;
+      });
+      return concernsInflight;
     }
-    return result;
+    return run;
   }
   async function createAssigneeConcern2(input, baseUrl = ERP_BASE_URL) {
     const result = await createAssigneeConcern(input, baseUrl);
@@ -1271,7 +1242,9 @@
       return result.ok ? { type: "USER_PROFILE", ok: true, profile: result.data } : { type: "USER_PROFILE", ok: false, error: result.error };
     }
     if (message.type === "LIST_CONCERNS") {
-      const result = await listAssigneeConcerns2(ERP_BASE_URL);
+      const result = await listAssigneeConcerns2(ERP_BASE_URL, {
+        force: Boolean(message.force)
+      });
       return result.ok ? { type: "CONCERNS", ok: true, concerns: result.data } : { type: "CONCERNS", ok: false, error: result.error };
     }
     if (message.type === "CREATE_CONCERN") {
@@ -1323,26 +1296,22 @@
     });
     return true;
   });
-  var authChangedTimer = null;
   chrome.cookies.onChanged.addListener((changeInfo) => {
     if (changeInfo.cookie.name !== "sid")
       return;
     if (!changeInfo.cookie.domain.includes("livro.systems"))
       return;
-    if (authChangedTimer)
-      clearTimeout(authChangedTimer);
-    authChangedTimer = setTimeout(() => {
-      authChangedTimer = null;
-      invalidateSessionCache();
-      invalidateConcernCaches();
-      chrome.tabs.query({}, (tabs) => {
-        for (const tab of tabs) {
-          if (tab.id == null)
-            continue;
-          chrome.tabs.sendMessage(tab.id, { type: "AUTH_CHANGED" }).catch(() => {});
-        }
-      });
-    }, 750);
+    if (!changeInfo.removed)
+      return;
+    invalidateSessionCache();
+    invalidateConcernCaches();
+    chrome.tabs.query({}, (tabs) => {
+      for (const tab of tabs) {
+        if (tab.id == null)
+          continue;
+        chrome.tabs.sendMessage(tab.id, { type: "AUTH_CHANGED" }).catch(() => {});
+      }
+    });
   });
   chrome.action.onClicked.addListener(() => {
     (async () => {
@@ -1356,5 +1325,5 @@
   });
 })();
 
-//# debugId=C4F312B79464166B64756E2164756E21
+//# debugId=F795A5BA50F3681B64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

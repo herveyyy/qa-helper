@@ -104,7 +104,9 @@ async function handleMessage(message: ExtensionRequest): Promise<ExtensionRespon
   }
 
   if (message.type === "LIST_CONCERNS") {
-    const result = await listAssigneeConcerns(ERP_BASE_URL);
+    const result = await listAssigneeConcerns(ERP_BASE_URL, {
+      force: Boolean(message.force),
+    });
     return result.ok
       ? { type: "CONCERNS", ok: true, concerns: result.data }
       : { type: "CONCERNS", ok: false, error: result.error };
@@ -187,28 +189,25 @@ chrome.runtime.onMessage.addListener((message: ExtensionRequest, _sender, sendRe
   return true;
 });
 
-let authChangedTimer: ReturnType<typeof setTimeout> | null = null;
-
 chrome.cookies.onChanged.addListener((changeInfo) => {
   if (changeInfo.cookie.name !== "sid") return;
   if (!changeInfo.cookie.domain.includes("livro.systems")) return;
 
-  // Debounce: ensureErpSidCookie / Desk login can fire many sid writes.
-  if (authChangedTimer) clearTimeout(authChangedTimer);
-  authChangedTimer = setTimeout(() => {
-    authChangedTimer = null;
-    invalidateSessionCache();
-    invalidateConcernCaches();
+  // Ignore sid overwrites (Connect / ensure cookie) — those caused fetch storms.
+  // Only react when the session cookie is actually cleared (logout / expiry).
+  if (!changeInfo.removed) return;
 
-    void chrome.tabs.query({}, (tabs) => {
-      for (const tab of tabs) {
-        if (tab.id == null) continue;
-        void chrome.tabs.sendMessage(tab.id, { type: "AUTH_CHANGED" }).catch(() => {
-          // Tab may not have the content script.
-        });
-      }
-    });
-  }, 750);
+  invalidateSessionCache();
+  invalidateConcernCaches();
+
+  void chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      void chrome.tabs.sendMessage(tab.id, { type: "AUTH_CHANGED" }).catch(() => {
+        // Tab may not have the content script.
+      });
+    }
+  });
 });
 
 chrome.action.onClicked.addListener(() => {

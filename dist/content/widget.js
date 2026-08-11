@@ -71,6 +71,7 @@
     menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
     send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
     plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
+    refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>`,
     search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
     spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
   };
@@ -401,9 +402,33 @@
     return parts.join(" > ");
   }
 
+  // src/shared/avatar.ts
+  function initialsAvatarUrl(nameOrEmail) {
+    const label = (nameOrEmail || "?").trim();
+    const parts = label.split(/[\s@._-]+/).filter(Boolean);
+    const initials = (parts.length >= 2 ? `${parts[0][0] || ""}${parts[1][0] || ""}` : (parts[0] || "?").slice(0, 2)).toUpperCase();
+    const hue = Math.abs(Array.from(label).reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 360;
+    const bg = `hsl(${hue} 42% 42%)`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="32" fill="${bg}"/>
+    <text x="32" y="34" text-anchor="middle" dominant-baseline="middle"
+      font-family="system-ui,Segoe UI,sans-serif" font-size="22" font-weight="600" fill="#fff">${escapeXml(initials)}</text>
+  </svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+  function avatarFallbackUrl(nameOrEmail) {
+    const name = (nameOrEmail || "").trim();
+    if (name)
+      return initialsAvatarUrl(name);
+    return defaultIconUrl();
+  }
+  function escapeXml(value) {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
   // src/content/concern-client.ts
-  async function listConcerns() {
-    const response = await sendRuntimeMessage({ type: "LIST_CONCERNS" });
+  async function listConcerns(force = false) {
+    const response = await sendRuntimeMessage({ type: "LIST_CONCERNS", force });
     if (response?.type === "CONCERNS") {
       if (response.ok)
         return { ok: true, concerns: response.concerns };
@@ -590,13 +615,13 @@
   }
 
   // src/content/widget/panels/concerns.ts
-  async function renderConcernsPanel(els, host) {
+  async function renderConcernsPanel(els, host, options = {}) {
     host.markConcernsActive();
     host.syncDockActive();
     els.panelTitle.textContent = "Concerns";
-    els.panelBody.innerHTML = loadingMarkup("Loading concerns…");
+    els.panelBody.innerHTML = loadingMarkup(options.force ? "Refreshing concerns…" : "Loading concerns…");
     host.showPanelVisual();
-    const result = await listConcerns();
+    const result = await listConcerns(Boolean(options.force));
     if (!result.ok) {
       els.panelBody.innerHTML = `
         <div class="space-y-3">
@@ -606,12 +631,13 @@
             data-retry-concerns
             class="flex w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-neutral-800 transition hover:bg-white"
           >
+            ${ICONS.refresh}
             Retry
           </button>
         </div>
       `;
       els.panelBody.querySelector("[data-retry-concerns]")?.addEventListener("click", () => {
-        renderConcernsPanel(els, host);
+        renderConcernsPanel(els, host, { force: true });
       });
       return;
     }
@@ -647,18 +673,32 @@
     els.panelBody.innerHTML = `
       <div class="mb-3 flex items-center justify-between gap-2">
         <p class="text-xs text-neutral-500">Your open concerns</p>
-        <button
-          type="button"
-          data-new-task
-          class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-neutral-900 text-white transition hover:bg-neutral-800"
-          aria-label="New task"
-          title="New task"
-        >
-          ${ICONS.plus}
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button
+            type="button"
+            data-refresh-concerns
+            class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-white/70 text-neutral-800 transition hover:bg-white"
+            aria-label="Refresh concerns"
+            title="Refresh"
+          >
+            ${ICONS.refresh}
+          </button>
+          <button
+            type="button"
+            data-new-task
+            class="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-neutral-900 text-white transition hover:bg-neutral-800"
+            aria-label="New task"
+            title="New task"
+          >
+            ${ICONS.plus}
+          </button>
+        </div>
       </div>
       ${listMarkup}
     `;
+    els.panelBody.querySelector("[data-refresh-concerns]")?.addEventListener("click", () => {
+      renderConcernsPanel(els, host, { force: true });
+    });
     els.panelBody.querySelector("[data-new-task]")?.addEventListener("click", () => {
       host.onNewTask();
     });
@@ -959,7 +999,8 @@
     const img = els.panelBody.querySelector("img");
     if (img) {
       img.onerror = () => {
-        img.src = defaultIconUrl();
+        img.onerror = null;
+        img.src = avatarFallbackUrl(profile.fullName || profile.email);
       };
     }
     els.panelBody.querySelector("[data-disconnect]")?.addEventListener("click", () => {
@@ -1006,7 +1047,8 @@
     const img = wrap.querySelector("img");
     if (img) {
       img.onerror = () => {
-        img.src = defaultIconUrl();
+        img.onerror = null;
+        img.src = avatarFallbackUrl("?");
       };
     }
     els.pinLayer.appendChild(wrap);
@@ -1033,7 +1075,9 @@
       pin.style.left = `${rect.left}px`;
       pin.style.top = `${Math.max(8, rect.top - 8)}px`;
       pin.title = `${item.concernName}: ${item.pin.text}`;
-      const avatar = item.commentEmail === profile?.email || item.commentEmail === profile?.userName ? avatarUrl : defaultIconUrl();
+      const isMe = item.commentEmail === profile?.email || item.commentEmail === profile?.userName;
+      const fallback = avatarFallbackUrl(item.commentBy || item.commentEmail);
+      const avatar = isMe ? avatarUrl : fallback;
       pin.innerHTML = `
         <button type="button" class="relative h-8 w-8" aria-label="Open pin comment">
           <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-sky-400" />
@@ -1042,11 +1086,19 @@
       const img = pin.querySelector("img");
       if (img) {
         img.onerror = () => {
-          img.src = defaultIconUrl();
+          img.onerror = null;
+          img.src = fallback;
         };
       }
-      pin.querySelector("button")?.addEventListener("click", () => {
+      const open = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         onOpen(item);
+      };
+      pin.querySelector("button")?.addEventListener("click", open);
+      pin.querySelector("button")?.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
       });
       els.pinLayer.appendChild(pin);
     }
@@ -1207,7 +1259,7 @@
       this.enableKeyShield();
       this.refreshSession().then((ok) => {
         if (ok)
-          this.refreshPagePins(true);
+          this.refreshPagePins(false);
         if (this.config.pinned && this.session) {
           this.setOpen(true);
           this.setPanel("concerns");
@@ -1245,13 +1297,8 @@
             return;
           if (message?.type === "AUTH_CHANGED") {
             this.refreshSession(false).then(async (ok) => {
-              if (ok) {
-                this.refreshPagePins(true);
-                if (this.activePanel === "login") {
-                  this.setPanel("concerns");
-                }
+              if (ok)
                 return;
-              }
               this.pagePins = [];
               this.renderSavedPins();
               if (this.open && this.activePanel !== "login") {
@@ -1291,7 +1338,9 @@
       return this.profile;
     }
     avatarUrl() {
-      return this.profile?.userImage || defaultIconUrl();
+      if (this.profile?.userImage)
+        return this.profile.userImage;
+      return avatarFallbackUrl(this.profile?.fullName || this.profile?.email || this.session?.email);
     }
     async requireSession() {
       const connected = await peekSid();
@@ -2026,7 +2075,7 @@
           renderPinLoadingBadge(els, false);
         if (this.pinsReloadQueued || this.pinsHref !== location.href) {
           this.pinsReloadQueued = false;
-          this.refreshPagePins(true);
+          this.refreshPagePins(false);
         }
       }
     }
@@ -2174,5 +2223,5 @@
   }
 })();
 
-//# debugId=5AB3AB3F0B3F5B8E64756E2164756E21
+//# debugId=64DE78776F12B47664756E2164756E21
 //# sourceMappingURL=widget.js.map

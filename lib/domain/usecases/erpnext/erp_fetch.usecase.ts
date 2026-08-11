@@ -30,24 +30,10 @@ async function readCsrfToken(site: string): Promise<string | null> {
   }
 }
 
-/** Soft GET so Frappe can mint/refresh csrf_token for the sid session. */
-async function refreshCsrfCookie(site: string): Promise<string | null> {
-  try {
-    await fetch(`${site}/api/method/frappe.auth.get_logged_user`, {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-  } catch {
-    /* ignore — cookie jar may still update */
-  }
-  return readCsrfToken(site);
-}
-
 /**
  * Privileged extension fetch to erp.livro.systems.
  * Attaches sid via credentials + X-Frappe-CSRF-Token for mutating calls.
+ * Never calls get_logged_user (that caused AUTH cookie storms).
  */
 export async function erpFetch(
   url: string,
@@ -58,10 +44,7 @@ export async function erpFetch(
   const method = (init.method || "GET").toUpperCase();
   const needsCsrf = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
 
-  let csrf = needsCsrf ? await readCsrfToken(site) : null;
-  if (needsCsrf && !csrf) {
-    csrf = await refreshCsrfCookie(site);
-  }
+  const csrf = needsCsrf ? await readCsrfToken(site) : null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort("ERP_TIMEOUT"), timeoutMs);
@@ -73,33 +56,13 @@ export async function erpFetch(
       headers["X-Frappe-CSRF-Token"] = csrf;
     }
 
-    let response = await fetch(url, {
+    return await fetch(url, {
       ...init,
       credentials: "include",
       cache: "no-store",
       signal: controller.signal,
       headers,
     });
-
-    // One retry after CSRF refresh (common after Connect / cookie rewrite).
-    if (needsCsrf && response.status === 400) {
-      const text = await response.clone().text();
-      if (/CSRFTokenError|csrf/i.test(text)) {
-        const next = await refreshCsrfCookie(site);
-        if (next) {
-          headers["X-Frappe-CSRF-Token"] = next;
-          response = await fetch(url, {
-            ...init,
-            credentials: "include",
-            cache: "no-store",
-            signal: controller.signal,
-            headers,
-          });
-        }
-      }
-    }
-
-    return response;
   } finally {
     clearTimeout(timer);
   }

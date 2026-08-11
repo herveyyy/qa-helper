@@ -21,7 +21,7 @@ export type ExtensionRequest =
   | { type: "CONNECT_ERP_DESK" }
   | { type: "DISCONNECT_ERP" }
   | { type: "GET_USER_PROFILE" }
-  | { type: "LIST_CONCERNS" }
+  | { type: "LIST_CONCERNS"; force?: boolean }
   | {
       type: "CREATE_CONCERN";
       subject: string;

@@ -21,6 +21,7 @@ type CacheEntry<T> = { at: number; data: T };
 
 let concernsCache: CacheEntry<Concern[]> | null = null;
 let concernsCacheEmail: string | null = null;
+let concernsInflight: Promise<ConcernResult<Concern[]>> | null = null;
 const pinsCache = new Map<string, CacheEntry<GiyaPinComment[]>>();
 
 function pageKey(email: string, href: string): string {
@@ -55,12 +56,25 @@ export async function listAssigneeConcerns(
     return { ok: true, data: concernsCache.data };
   }
 
-  const result = await listAssigneeConcernsUseCase(baseUrl);
-  if (result.ok) {
-    concernsCache = { at: Date.now(), data: result.data };
-    concernsCacheEmail = email;
+  if (!options.force && concernsInflight) return concernsInflight;
+
+  const run = (async () => {
+    const result = await listAssigneeConcernsUseCase(baseUrl);
+    if (result.ok) {
+      concernsCache = { at: Date.now(), data: result.data };
+      concernsCacheEmail = email;
+    }
+    return result;
+  })();
+
+  if (!options.force) {
+    concernsInflight = run.finally(() => {
+      concernsInflight = null;
+    });
+    return concernsInflight;
   }
-  return result;
+
+  return run;
 }
 
 export async function createAssigneeConcern(

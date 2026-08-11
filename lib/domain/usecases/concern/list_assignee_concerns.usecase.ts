@@ -18,7 +18,7 @@ const DONE_STATUSES = new Set(["completed", "cancelled", "closed"]);
 
 /**
  * Open Sprint Backlogs where the signed-in user is current_assignee.
- * Always hits erp.livro.systems — never the host page origin.
+ * Uses GET (no CSRF) against erp.livro.systems only.
  */
 export async function listAssigneeConcerns(
   _baseUrl: string = ERP_BASE_URL
@@ -29,7 +29,6 @@ export async function listAssigneeConcerns(
   const session = await getExtensionSession(site);
   if (!session.ok) return session;
 
-  // Cookie user_id can be percent-encoded; normalize for Link filters.
   let email = session.data.email.trim();
   try {
     email = decodeURIComponent(email);
@@ -37,30 +36,27 @@ export async function listAssigneeConcerns(
     /* keep raw */
   }
 
+  const params = new URLSearchParams({
+    doctype: "Sprint Backlogs",
+    fields: JSON.stringify([
+      "name",
+      "subject",
+      "status",
+      "type",
+      "priority",
+      "sprint_assign",
+      "dev_assignee",
+      "current_assignee",
+    ]),
+    filters: JSON.stringify([["current_assignee", "=", email]]),
+    order_by: "modified desc",
+    limit_page_length: "50",
+  });
+
   try {
     const res = await erpFetch(
-      `${site}/api/method/frappe.client.get_list`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Sprint Backlogs",
-          fields: [
-            "name",
-            "subject",
-            "status",
-            "type",
-            "priority",
-            "sprint_assign",
-            "dev_assignee",
-            "current_assignee",
-          ],
-          // Simple equality only — "not in" arrays return 400 on this site.
-          filters: [["current_assignee", "=", email]],
-          order_by: "modified desc",
-          limit_page_length: 50,
-        }),
-      },
+      `${site}/api/method/frappe.client.get_list?${params}`,
+      { method: "GET" },
       15_000
     );
 
