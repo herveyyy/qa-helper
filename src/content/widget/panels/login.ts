@@ -28,7 +28,7 @@ export function renderLoginPanel(els: WidgetElements, host: LoginPanelHost): voi
     ? `
       <div class="space-y-3">
         <p class="text-xs leading-relaxed text-neutral-600">
-          Enter the verification code sent to your email (same as Giya AI / Desk OTP).
+          Enter the verification code sent to your email (same as Desk OTP).
         </p>
         <input
           data-otp
@@ -46,7 +46,7 @@ export function renderLoginPanel(els: WidgetElements, host: LoginPanelHost): voi
           ${ICONS.login}
           Verify &amp; connect
         </button>
-        <button type="button" data-back-login class="w-full text-xs font-medium text-sky-700 hover:text-sky-900">
+        <button type="button" data-back-login class="w-full text-xs font-medium text-neutral-700 underline-offset-2 hover:underline">
           Back to email / password
         </button>
         <p data-auth-status class="text-xs text-neutral-500"></p>
@@ -54,7 +54,7 @@ export function renderLoginPanel(els: WidgetElements, host: LoginPanelHost): voi
     : `
       <div class="space-y-3">
         <p class="text-xs leading-relaxed text-neutral-600">
-          Connect Giya to Livro with your ERP login (explicit session — not silent cookie reuse).
+          Connect Faye to Livro with your ERP login (explicit session — not silent cookie reuse).
         </p>
         <input
           data-email

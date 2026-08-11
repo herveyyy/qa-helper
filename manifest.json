@@ -1,6 +1,6 @@
 {
-  "name": "Giya",
-  "description": "Floating Giya assistant with a right sidebar on any page.",
+  "name": "Faye",
+  "description": "Floating Faye assistant with a right sidebar on any page.",
   "version": "0.1.0",
   "manifest_version": 3,
   "icons": {
@@ -9,7 +9,7 @@
     "128": "assets/giya-icon.png"
   },
   "action": {
-    "default_title": "Giya",
+    "default_title": "Faye",
     "default_icon": {
       "16": "assets/giya-icon.png",
       "48": "assets/giya-icon.png",

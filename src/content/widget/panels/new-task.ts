@@ -75,7 +75,7 @@ export function renderNewTaskPanel(
       const created = await createConcern({
         subject,
         type: typeSelect?.value || "Bugs/Issues",
-        description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`,
+        description: `<p>Created from Faye on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`,
       });
       if (!created.ok) {
         if (createStatus) createStatus.textContent = created.error;

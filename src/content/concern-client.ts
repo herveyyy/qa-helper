@@ -13,7 +13,7 @@ export async function listConcerns(force = false): Promise<
     if (response.ok) return { ok: true, concerns: response.concerns };
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function createConcern(input: {
@@ -33,7 +33,7 @@ export async function createConcern(input: {
     if (response.ok) return { ok: true, concern: response.concern };
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function listPagePins(href: string): Promise<
@@ -44,7 +44,7 @@ export async function listPagePins(href: string): Promise<
     if (response.ok) return { ok: true, pins: response.pins };
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function addConcernPin(
@@ -60,7 +60,7 @@ export async function addConcernPin(
     if (response.ok) return { ok: true, commentName: response.commentName };
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function listPinThread(
@@ -76,7 +76,7 @@ export async function listPinThread(
     if (response.ok) return { ok: true, comments: response.comments };
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function getConcernDevops(
@@ -99,7 +99,7 @@ export async function getConcernDevops(
     }
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function resolveConcern(
@@ -122,7 +122,7 @@ export async function resolveConcern(
     }
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function uploadErpFile(input: {
@@ -160,5 +160,5 @@ export async function uploadErpFile(input: {
     }
     return { ok: false, error: response.error };
   }
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }

@@ -18,7 +18,7 @@ export async function fetchSession(force = false): Promise<
     return { ok: false, error: response.error };
   }
 
-  return { ok: false, error: "Reload this page — Giya was updated." };
+  return { ok: false, error: "Reload this page — Faye was updated." };
 }
 
 export async function fetchUserProfile(): Promise<
@@ -44,7 +44,7 @@ export async function connectErpPassword(
 > {
   const response = await sendRuntimeMessage({ type: "CONNECT_ERP", usr, pwd });
   if (response?.type !== "CONNECT_ERP") {
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   if (!response.ok) return { ok: false, error: response.error };
   if (response.needsOtp) {
@@ -74,7 +74,7 @@ export async function connectErpOtp(
     usr,
   });
   if (response?.type !== "CONNECT_ERP") {
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   if (!response.ok) return { ok: false, error: response.error };
   if (response.needsOtp) {
@@ -88,7 +88,7 @@ export async function connectErpFromDesk(): Promise<
 > {
   const response = await sendRuntimeMessage({ type: "CONNECT_ERP_DESK" });
   if (response?.type !== "CONNECT_ERP") {
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   if (!response.ok) return { ok: false, error: response.error };
   if (response.needsOtp) {

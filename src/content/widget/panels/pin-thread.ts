@@ -27,7 +27,7 @@ function threadItemHtml(item: GiyaPinComment, depth: number): string {
   return `
     <article
       data-thread-comment="${escapeHtml(item.commentName)}"
-      class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2 ${reply ? "ml-3 border-l-2 border-l-sky-400/60" : ""}"
+      class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2 ${reply ? "ml-3 border-l-2 border-l-neutral-400/70" : ""}"
       style="margin-left:${indent}px"
     >
       <div class="flex items-start gap-2">
@@ -46,7 +46,7 @@ function threadItemHtml(item: GiyaPinComment, depth: number): string {
           <button
             type="button"
             data-reply-to="${escapeHtml(item.commentName)}"
-            class="text-[11px] font-medium text-sky-700 hover:text-sky-900"
+            class="text-[11px] font-medium text-neutral-700 underline-offset-2 hover:underline"
           >Reply</button>
         </div>
       </div>
@@ -91,7 +91,7 @@ export async function renderPinThreadPanel(
             type="button"
             data-resolve
             hidden
-            class="rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-600"
+            class="rounded-full bg-neutral-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-neutral-800"
           >Mark as resolve</button>
         </div>
         <p data-resolve-status class="text-[11px] text-neutral-500"></p>
@@ -107,7 +107,7 @@ export async function renderPinThreadPanel(
           <button
             type="button"
             data-reply-submit
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-md transition hover:bg-sky-600"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-white shadow-md transition hover:bg-neutral-800"
             aria-label="Send reply"
           >${ICONS.send}</button>
         </div>
@@ -146,13 +146,13 @@ export async function renderPinThreadPanel(
     if (resolved) {
       chip.textContent = devopsStatus || "Resolved";
       chip.className =
-        "rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700";
+        "rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white";
       resolveBtn.hidden = true;
       resolveStatus.textContent = "";
     } else {
       chip.textContent = "Not resolved";
       chip.className =
-        "rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-800";
+        "rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-medium text-neutral-800";
       resolveBtn.hidden = false;
     }
   };
@@ -185,7 +185,7 @@ export async function renderPinThreadPanel(
   const reloadThread = async () => {
     const result = await listPinThread(root.concernName, threadId);
     if (!result.ok) {
-      listEl.innerHTML = `<p class="text-xs text-rose-600">${escapeHtml(result.error)}</p>`;
+      listEl.innerHTML = `<p class="text-xs text-neutral-600">${escapeHtml(result.error)}</p>`;
       return;
     }
     comments = result.comments.length ? result.comments : [root];

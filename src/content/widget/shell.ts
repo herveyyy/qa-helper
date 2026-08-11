@@ -8,7 +8,7 @@ export function widgetShellHtml(): string {
 
       <div
         data-highlight
-        class="pointer-events-none fixed z-1 rounded-md border-2 border-sky-400 bg-sky-400/15 opacity-0 transition-opacity duration-75"
+        class="pointer-events-none fixed z-1 rounded-md border-2 border-neutral-900 bg-neutral-900/10 opacity-0 transition-opacity duration-75"
         hidden
       ></div>
 
@@ -26,7 +26,7 @@ export function widgetShellHtml(): string {
         data-dock
         class="pointer-events-auto fixed z-3 flex flex-col items-center gap-1 rounded-full border border-white/50 bg-white/55 p-1.5 shadow-lg shadow-black/10 backdrop-blur-xl transition duration-200 ease-out scale-95 opacity-0"
         role="toolbar"
-        aria-label="Giya"
+        aria-label="Faye"
         hidden
       >
         <button type="button" data-nav class="${ICON_BTN_CLASS}" aria-label="Concerns" title="Concerns" data-active="false" data-mode="concerns">
@@ -50,7 +50,7 @@ export function widgetShellHtml(): string {
         data-panel
         class="pointer-events-auto fixed z-4 flex flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
         role="dialog"
-        aria-label="Giya panel"
+        aria-label="Faye panel"
         hidden
       >
         <header data-panel-header class="flex shrink-0 cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
@@ -74,7 +74,7 @@ export function widgetShellHtml(): string {
         type="button"
         data-fab
         class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
-        aria-label="Open Giya"
+        aria-label="Open Faye"
         aria-expanded="false"
       >
         <img data-fab-icon class="pointer-events-none h-4 w-4 rounded-full object-cover" alt="" draggable="false" />

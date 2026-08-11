@@ -45,7 +45,7 @@ export async function createAssigneeConcern(
   const priority = (input.priority || "Medium").trim() || "Medium";
   const description =
     input.description?.trim() ||
-    "<p>Created from Giya.</p>";
+    "<p>Created from Faye.</p>";
   const expStartDate = new Date().toISOString().slice(0, 10);
 
   try {

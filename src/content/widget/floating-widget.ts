@@ -712,7 +712,7 @@ export class FloatingWidget {
     const { backdrop, dock, fab } = els;
 
     fab.setAttribute("aria-expanded", String(this.open));
-    fab.setAttribute("aria-label", this.open ? "Close Giya" : "Open Giya");
+    fab.setAttribute("aria-label", this.open ? "Close Faye" : "Open Faye");
     fab.hidden = this.open;
     fab.classList.toggle("opacity-0", this.open);
 

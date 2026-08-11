@@ -10,11 +10,14 @@ export function initialsAvatarUrl(nameOrEmail: string): string {
       : (parts[0] || "?").slice(0, 2)
   ).toUpperCase();
 
-  const hue =
-    Math.abs(
+  // Monochrome: hash → gray step (no accent hues).
+  const tone =
+    28 +
+    (Math.abs(
       Array.from(label).reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
-    ) % 360;
-  const bg = `hsl(${hue} 42% 42%)`;
+    ) %
+      40);
+  const bg = `hsl(0 0% ${tone}%)`;
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <rect width="64" height="64" rx="32" fill="${bg}"/>

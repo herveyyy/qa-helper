@@ -22,7 +22,7 @@ async function refresh(force = true): Promise<void> {
   if (response?.type !== "SESSION") {
     signedIn.classList.add("hidden");
     signedOut.classList.remove("hidden");
-    setStatus("Reload this page — Giya was updated.");
+    setStatus("Reload this page — Faye was updated.");
     return;
   }
 

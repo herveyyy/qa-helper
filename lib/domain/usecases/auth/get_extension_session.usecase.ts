@@ -58,7 +58,7 @@ async function resolveSession(
     if (!connection) {
       const result: AuthResult<ExtensionSession> = {
         ok: false,
-        error: "Connect Livro in Giya first.",
+        error: "Connect Livro in Faye first.",
       };
       memoryCache = { at: Date.now(), result };
       return result;
@@ -99,7 +99,7 @@ async function resolveSession(
     if (!email || email === "Guest") {
       const result: AuthResult<ExtensionSession> = {
         ok: false,
-        error: "Connect Livro in Giya first.",
+        error: "Connect Livro in Faye first.",
       };
       memoryCache = { at: Date.now(), result };
       return result;

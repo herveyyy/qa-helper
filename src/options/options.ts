@@ -121,7 +121,7 @@ resetBtn.addEventListener("click", () => {
     urlInput.value = "";
     fileInput.value = "";
     await refreshPreview();
-    setStatus("Reset to the default Giya logo.");
+    setStatus("Reset to the default Faye logo.");
   })();
 });
 

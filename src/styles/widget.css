@@ -16,28 +16,28 @@
 }
 
 /*
- * Contrast theme: light parent page → dark Giya; dark parent → light Giya.
- * Applied via [data-giya-theme] on the shadow root wrapper.
+ * Monochrome chrome theme via [data-giya-theme].
+ * Dark: ink / ash / chalk — no accent hues.
  */
 [data-giya-theme="dark"] [data-dock] {
-  border-color: rgb(255 255 255 / 0.12);
-  background: rgb(23 23 23 / 0.72);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(18 18 18 / 0.88);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
 }
 
 [data-giya-theme="dark"] [data-panel] {
-  border-color: rgb(255 255 255 / 0.12);
-  background: rgb(23 23 23 / 0.82);
-  color: rgb(245 245 245);
-  box-shadow: 0 20px 48px rgb(0 0 0 / 0.5);
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(18 18 18 / 0.92);
+  color: rgb(250 250 250);
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.6);
 }
 
 [data-giya-theme="dark"] [data-panel-header] {
-  border-color: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.1);
 }
 
 [data-giya-theme="dark"] [data-panel-title] {
-  color: rgb(245 245 245);
+  color: rgb(250 250 250);
 }
 
 [data-giya-theme="dark"] [data-dock] button,
@@ -47,76 +47,115 @@
 
 [data-giya-theme="dark"] [data-dock] button:hover,
 [data-giya-theme="dark"] [data-close-panel]:hover {
-  background: rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.12);
   color: rgb(255 255 255);
 }
 
 [data-giya-theme="dark"] [data-dock] button[data-active="true"] {
-  background: rgb(255 255 255);
-  color: rgb(23 23 23);
+  background: rgb(250 250 250);
+  color: rgb(18 18 18);
 }
 
 [data-giya-theme="dark"] [data-fab] {
-  border-color: rgb(255 255 255 / 0.2);
+  border-color: rgb(255 255 255 / 0.28);
   background: rgb(250 250 250);
   outline-color: rgb(250 250 250);
 }
 
 [data-giya-theme="dark"] [data-backdrop] {
-  background: rgb(0 0 0 / 0.35);
+  background: rgb(0 0 0 / 0.45);
 }
 
 [data-giya-theme="dark"] [data-pin-loading] {
-  border-color: rgb(255 255 255 / 0.12);
-  background: rgb(23 23 23 / 0.85);
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(18 18 18 / 0.9);
   color: rgb(212 212 212);
+}
+
+[data-giya-theme="dark"] [data-highlight] {
+  border-color: rgb(250 250 250);
+  background: rgb(255 255 255 / 0.1);
+}
+
+[data-giya-theme="dark"] [data-pin-layer] [class*="ring-"] {
+  --tw-ring-color: rgb(250 250 250) !important;
+}
+
+[data-giya-theme="dark"] [data-pin-layer] [class*="bg-neutral-900"],
+[data-giya-theme="dark"] [data-pin-layer] [class*="bg-sky-"] {
+  background-color: rgb(250 250 250) !important;
+  color: rgb(18 18 18) !important;
 }
 
 /* Soft remaps for panel content that uses light utility classes */
 [data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-9"],
 [data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-8"],
 [data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-7"] {
-  color: rgb(245 245 245) !important;
+  color: rgb(250 250 250) !important;
 }
 
 [data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-6"],
 [data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-5"],
 [data-giya-theme="dark"] [data-panel-body] [class*="text-neutral-4"] {
-  color: rgb(163 163 163) !important;
+  color: rgb(180 180 180) !important;
 }
 
 [data-giya-theme="dark"] [data-panel-body] [class*="bg-white"] {
-  background-color: rgb(38 38 38 / 0.75) !important;
+  background-color: rgb(32 32 32 / 0.92) !important;
 }
 
-[data-giya-theme="dark"] [data-panel-body] [class*="border-black"] {
-  border-color: rgb(255 255 255 / 0.12) !important;
+[data-giya-theme="dark"] [data-panel-body] [class*="border-black"],
+[data-giya-theme="dark"] [data-panel-body] [class*="border-l-"] {
+  border-color: rgb(255 255 255 / 0.16) !important;
 }
 
 [data-giya-theme="dark"] [data-panel-body] input,
 [data-giya-theme="dark"] [data-panel-body] textarea,
 [data-giya-theme="dark"] [data-panel-body] select {
-  color: rgb(245 245 245);
-  background-color: rgb(38 38 38 / 0.85);
-  border-color: rgb(255 255 255 / 0.14);
+  color: rgb(250 250 250);
+  background-color: rgb(32 32 32 / 0.95);
+  border-color: rgb(255 255 255 / 0.18);
 }
 
 [data-giya-theme="dark"] [data-panel-body] input::placeholder,
 [data-giya-theme="dark"] [data-panel-body] textarea::placeholder {
-  color: rgb(115 115 115);
+  color: rgb(140 140 140);
 }
 
-[data-giya-theme="dark"] [data-panel-body] [class*="bg-neutral-900"] {
-  background-color: rgb(245 245 245) !important;
-  color: rgb(23 23 23) !important;
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-neutral-900"],
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-sky-"],
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-emerald-"] {
+  background-color: rgb(250 250 250) !important;
+  color: rgb(18 18 18) !important;
 }
 
-[data-giya-theme="dark"] [data-panel-body] [class*="hover:bg-neutral-800"]:hover {
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-amber-"],
+[data-giya-theme="dark"] [data-panel-body] [class*="bg-neutral-200"] {
+  background-color: rgb(48 48 48) !important;
+  color: rgb(250 250 250) !important;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="hover:bg-neutral-800"]:hover,
+[data-giya-theme="dark"] [data-panel-body] [class*="hover:bg-sky-"]:hover,
+[data-giya-theme="dark"] [data-panel-body] [class*="hover:bg-emerald-"]:hover {
   background-color: rgb(229 229 229) !important;
 }
 
+[data-giya-theme="dark"] [data-panel-body] [class*="text-sky-"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-emerald-"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-amber-"],
+[data-giya-theme="dark"] [data-panel-body] [class*="text-rose-"],
+[data-giya-theme="dark"] [data-panel-body] [class*="hover:text-sky-"] {
+  color: rgb(229 229 229) !important;
+}
+
+[data-giya-theme="dark"] [data-panel-body] [class*="ring-sky-"] {
+  --tw-ring-color: rgb(250 250 250) !important;
+}
+
 [data-giya-theme="dark"] [data-panel-resize] span {
-  border-color: rgb(163 163 163 / 0.9);
+  border-color: rgb(180 180 180 / 0.95);
 }
 
 [data-panel] {
@@ -141,8 +180,8 @@
   gap: 0.2rem;
   padding: 0.3rem;
   border-radius: 999px;
-  background: rgb(38 38 38);
-  color: white;
+  background: rgb(24 24 24);
+  color: rgb(250 250 250);
 }
 
 .giya-rte-btn {
@@ -212,16 +251,25 @@
   margin: 0.25rem 0;
 }
 
+[data-giya-theme="dark"] .giya-rte-toolbar {
+  background: rgb(40 40 40);
+  color: rgb(250 250 250);
+}
+
 [data-giya-theme="dark"] .giya-rte-editor {
-  border-color: rgb(255 255 255 / 0.14);
-  background: rgb(38 38 38 / 0.85);
-  color: rgb(245 245 245);
+  border-color: rgb(255 255 255 / 0.18);
+  background: rgb(32 32 32 / 0.95);
+  color: rgb(250 250 250);
+}
+
+[data-giya-theme="dark"] .giya-rte-editor:focus {
+  box-shadow: 0 0 0 2px rgb(250 250 250 / 0.28);
 }
 
 [data-giya-theme="dark"] .giya-rte-editor:empty::before {
-  color: rgb(115 115 115);
+  color: rgb(140 140 140);
 }
 
 [data-giya-theme="dark"] .giya-comment-html {
-  color: rgb(245 245 245) !important;
+  color: rgb(250 250 250) !important;
 }

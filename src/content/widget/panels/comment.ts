@@ -32,16 +32,16 @@ export function renderCommentPanel(
       <div class="space-y-3">
         <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Concern</p>
-          <p class="mt-0.5 font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(concern.name)}</p>
+          <p class="mt-0.5 font-mono text-[10px] font-semibold text-neutral-700">${escapeHtml(concern.name)}</p>
           <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(concern.subject)}</p>
-          <button type="button" data-change-concern class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
+          <button type="button" data-change-concern class="mt-2 text-xs font-medium text-neutral-700 underline-offset-2 hover:underline">
             Change concern
           </button>
         </div>
         <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Pinned to</p>
           <p class="mt-0.5 break-all text-xs font-medium text-neutral-900">${escapeHtml(picked.label)}</p>
-          <button type="button" data-retarget class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
+          <button type="button" data-retarget class="mt-2 text-xs font-medium text-neutral-700 underline-offset-2 hover:underline">
             Change element
           </button>
         </div>
@@ -51,7 +51,7 @@ export function renderCommentPanel(
           <button
             type="button"
             data-comment-submit
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-md transition hover:bg-sky-600"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-white shadow-md transition hover:bg-neutral-800"
             aria-label="Send comment"
           >
             ${ICONS.send}

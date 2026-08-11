@@ -51,7 +51,7 @@ export function buildGiyaPinCommentHtml(pin: GiyaPinPayload): string {
   return (
     `<div ${MARKER}="1" data-giya-json="${payload}">` +
     `<div class="giya-comment-body">${bodyHtml}</div>` +
-    `<p><small>Giya pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a>` +
+    `<p><small>Faye pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a>` +
     (plain ? ` · ${escapeHtml(plain.slice(0, 80))}` : "") +
     `</small></p>` +
     specsHtml +

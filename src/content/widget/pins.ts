@@ -38,7 +38,7 @@ export function renderDraftPin(els: WidgetElements, rect: DOMRect, avatarUrl: st
           alt=""
           class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-white"
         />
-        <span class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-sky-500 text-[10px] font-bold leading-none text-white ring-2 ring-white">+</span>
+        <span class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-neutral-900 text-[10px] font-bold leading-none text-white ring-2 ring-white">+</span>
       </div>
     `;
   const img = wrap.querySelector("img");
@@ -87,7 +87,7 @@ export function renderSavedPins(
     const avatar = isMe ? avatarUrl : fallback;
     pin.innerHTML = `
         <button type="button" class="relative h-8 w-8" aria-label="Open pin comment">
-          <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-sky-400" />
+          <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-neutral-900" />
         </button>
       `;
     const img = pin.querySelector("img");
