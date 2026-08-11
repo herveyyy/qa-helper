@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Giya — Profile</title>
+    <link rel="stylesheet" href="user.css" />
+  </head>
+  <body class="min-h-screen bg-neutral-100 text-neutral-900 antialiased">
+    <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
+      <div class="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl shadow-black/5 backdrop-blur-xl">
+        <div id="loading" class="space-y-3 text-center">
+          <div class="mx-auto h-20 w-20 animate-pulse rounded-full bg-neutral-200"></div>
+          <p class="text-sm text-neutral-500">Loading profile…</p>
+        </div>
+
+        <div id="error" class="hidden space-y-4 text-center">
+          <p id="error-text" class="text-sm text-neutral-600"></p>
+          <button
+            id="go-login"
+            type="button"
+            class="w-full rounded-full bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
+          >
+            Sign in
+          </button>
+        </div>
+
+        <div id="profile" class="hidden space-y-6">
+          <div class="flex flex-col items-center text-center">
+            <img
+              id="avatar"
+              src="../assets/giya-icon.png"
+              alt="Profile photo"
+              class="h-24 w-24 rounded-full object-cover shadow-md ring-2 ring-white"
+            />
+            <h1 id="full-name" class="mt-4 text-xl font-semibold tracking-tight"></h1>
+            <p id="email" class="mt-1 text-sm text-neutral-500"></p>
+          </div>
+
+          <dl class="space-y-3 rounded-2xl border border-neutral-200/80 bg-white/60 px-4 py-3 text-left">
+            <div>
+              <dt class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">User</dt>
+              <dd id="user-name" class="break-all text-sm text-neutral-900"></dd>
+            </div>
+            <div>
+              <dt class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Desk</dt>
+              <dd>
+                <a
+                  id="desk-link"
+                  href="#"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="break-all text-sm font-medium text-sky-700 hover:text-sky-900"
+                ></a>
+              </dd>
+            </div>
+          </dl>
+
+          <div class="flex flex-col gap-2">
+            <button
+              id="refresh"
+              type="button"
+              class="w-full rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 transition hover:bg-neutral-50"
+            >
+              Refresh profile
+            </button>
+            <button
+              id="close-tab"
+              type="button"
+              class="w-full rounded-full bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+
+        <p id="status" class="mt-4 min-h-5 text-center text-sm text-neutral-500" role="status"></p>
+      </div>
+    </main>
+    <script src="user.js"></script>
+  </body>
+</html>

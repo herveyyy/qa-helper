@@ -1,0 +1,41 @@
+{
+  "name": "Giya",
+  "description": "Floating Giya assistant with a right sidebar on any page.",
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "icons": {
+    "16": "assets/giya-icon.png",
+    "48": "assets/giya-icon.png",
+    "128": "assets/giya-icon.png"
+  },
+  "action": {
+    "default_title": "Giya",
+    "default_icon": {
+      "16": "assets/giya-icon.png",
+      "48": "assets/giya-icon.png",
+      "128": "assets/giya-icon.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "permissions": ["storage", "cookies", "tabs"],
+  "host_permissions": ["<all_urls>", "https://erp.livro.systems/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/giya-icon.png", "content/widget.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/widget.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Giya — Sign in</title>
+    <link rel="stylesheet" href="login.css" />
+  </head>
+  <body class="min-h-screen bg-neutral-100 text-neutral-900 antialiased">
+    <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
+      <div class="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl shadow-black/5 backdrop-blur-xl">
+        <div class="mb-6 flex items-center gap-3">
+          <img src="../assets/giya-icon.png" alt="" class="h-10 w-10 rounded-xl object-cover" />
+          <div>
+            <h1 class="text-xl font-semibold tracking-tight">Giya</h1>
+            <p class="text-sm text-neutral-500">Sign in with Livro ERP to continue</p>
+          </div>
+        </div>
+
+        <div id="signed-out" class="space-y-4">
+          <p class="text-sm leading-relaxed text-neutral-600">
+            Features (comments, environment, pin) stay locked until your
+            <span class="font-medium text-neutral-900">sid</span> session on
+            erp.livro.systems is valid — same gate as giya-ai.
+          </p>
+          <button
+            id="login-livro"
+            type="button"
+            class="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
+          >
+            Login at erp.livro.systems
+          </button>
+          <button
+            id="recheck"
+            type="button"
+            class="w-full rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 transition hover:bg-neutral-50"
+          >
+            I’ve signed in — check SID
+          </button>
+        </div>
+
+        <div id="signed-in" class="hidden space-y-4">
+          <p class="text-sm text-neutral-600">
+            Signed in as
+            <span id="email" class="font-medium text-neutral-900"></span>
+          </p>
+          <p class="text-xs text-neutral-500">
+            You can close this tab and use the Giya icon on any page.
+          </p>
+          <button
+            id="close-tab"
+            type="button"
+            class="w-full rounded-full bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
+          >
+            Continue
+          </button>
+        </div>
+
+        <p id="status" class="mt-4 min-h-5 text-sm text-neutral-500" role="status"></p>
+      </div>
+    </main>
+    <script src="login.js"></script>
+  </body>
+</html>

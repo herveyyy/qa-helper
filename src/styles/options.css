@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+@source "../options/options.html";
+@source "../options/options.ts";

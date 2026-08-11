@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@source "../content/widget.ts";
+@source "../content/icons.ts";
+@source "../content/env-specs.ts";
+@source "../content/element-picker.ts";
+@source "../content/auth-client.ts";
+@source "../content/concern-client.ts";
+
+/* Host reset so page styles do not leak into the shadow tree */
+:host {
+  all: initial;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
