@@ -274,7 +274,7 @@
       if (!connection) {
         const result2 = {
           ok: false,
-          error: "Connect Livro in Giya first."
+          error: "Connect Livro in Faye first."
         };
         memoryCache = { at: Date.now(), result: result2 };
         return result2;
@@ -302,7 +302,7 @@
       if (!email || email === "Guest") {
         const result2 = {
           ok: false,
-          error: "Connect Livro in Giya first."
+          error: "Connect Livro in Faye first."
         };
         memoryCache = { at: Date.now(), result: result2 };
         return result2;
@@ -605,7 +605,7 @@
     const email = session.data.email;
     const type = (input.type || "Bugs/Issues").trim() || "Bugs/Issues";
     const priority = (input.priority || "Medium").trim() || "Medium";
-    const description = input.description?.trim() || "<p>Created from Giya.</p>";
+    const description = input.description?.trim() || "<p>Created from Faye.</p>";
     const expStartDate = new Date().toISOString().slice(0, 10);
     try {
       const res = await erpFetch(`${site}/api/method/frappe.client.insert`, {
@@ -876,7 +876,7 @@
       text: bodyHtml
     }));
     const specsHtml = pin.envSpecs?.length ? buildEnvSpecsHtml(pin.envSpecs) : "";
-    return `<div ${MARKER}="1" data-giya-json="${payload}">` + `<div class="giya-comment-body">${bodyHtml}</div>` + `<p><small>Giya pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a>` + (plain ? ` · ${escapeHtml(plain.slice(0, 80))}` : "") + `</small></p>` + specsHtml + `</div>`;
+    return `<div ${MARKER}="1" data-giya-json="${payload}">` + `<div class="giya-comment-body">${bodyHtml}</div>` + `<p><small>Faye pin · <a href="${escapeAttr(pin.href)}">${escapeHtml(pin.label)}</a>` + (plain ? ` · ${escapeHtml(plain.slice(0, 80))}` : "") + `</small></p>` + specsHtml + `</div>`;
   }
   function parseGiyaPinFromCommentHtml(content) {
     if (!content.includes(MARKER))
@@ -1719,5 +1719,5 @@
   });
 })();
 
-//# debugId=C57F116AB5094EBC64756E2164756E21
+//# debugId=27D0F64281F7D4B264756E2164756E21
 //# sourceMappingURL=service-worker.js.map

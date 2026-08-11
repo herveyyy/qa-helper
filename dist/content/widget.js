@@ -215,7 +215,7 @@
         return { ok: true, session: response.session };
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function fetchUserProfile() {
     const response = await sendRuntimeMessage({ type: "GET_USER_PROFILE" });
@@ -229,7 +229,7 @@
   async function connectErpPassword(usr, pwd) {
     const response = await sendRuntimeMessage({ type: "CONNECT_ERP", usr, pwd });
     if (response?.type !== "CONNECT_ERP") {
-      return { ok: false, error: "Reload this page — Giya was updated." };
+      return { ok: false, error: "Reload this page — Faye was updated." };
     }
     if (!response.ok)
       return { ok: false, error: response.error };
@@ -252,7 +252,7 @@
       usr
     });
     if (response?.type !== "CONNECT_ERP") {
-      return { ok: false, error: "Reload this page — Giya was updated." };
+      return { ok: false, error: "Reload this page — Faye was updated." };
     }
     if (!response.ok)
       return { ok: false, error: response.error };
@@ -264,7 +264,7 @@
   async function connectErpFromDesk() {
     const response = await sendRuntimeMessage({ type: "CONNECT_ERP_DESK" });
     if (response?.type !== "CONNECT_ERP") {
-      return { ok: false, error: "Reload this page — Giya was updated." };
+      return { ok: false, error: "Reload this page — Faye was updated." };
     }
     if (!response.ok)
       return { ok: false, error: response.error };
@@ -424,8 +424,8 @@
     const label = (nameOrEmail || "?").trim();
     const parts = label.split(/[\s@._-]+/).filter(Boolean);
     const initials = (parts.length >= 2 ? `${parts[0][0] || ""}${parts[1][0] || ""}` : (parts[0] || "?").slice(0, 2)).toUpperCase();
-    const hue = Math.abs(Array.from(label).reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 360;
-    const bg = `hsl(${hue} 42% 42%)`;
+    const tone = 28 + Math.abs(Array.from(label).reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 40;
+    const bg = `hsl(0 0% ${tone}%)`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <rect width="64" height="64" rx="32" fill="${bg}"/>
     <text x="32" y="34" text-anchor="middle" dominant-baseline="middle"
@@ -451,7 +451,7 @@
         return { ok: true, concerns: response.concerns };
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function createConcern(input) {
     const response = await sendRuntimeMessage({
@@ -466,7 +466,7 @@
         return { ok: true, concern: response.concern };
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function listPagePins(href) {
     const response = await sendRuntimeMessage({ type: "LIST_PAGE_PINS", href });
@@ -475,7 +475,7 @@
         return { ok: true, pins: response.pins };
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function addConcernPin(concernName, pin) {
     const response = await sendRuntimeMessage({
@@ -488,7 +488,7 @@
         return { ok: true, commentName: response.commentName };
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function listPinThread(concernName, threadId) {
     const response = await sendRuntimeMessage({
@@ -501,7 +501,7 @@
         return { ok: true, comments: response.comments };
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function getConcernDevops(concernName) {
     const response = await sendRuntimeMessage({
@@ -518,7 +518,7 @@
       }
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function resolveConcern(concernName) {
     const response = await sendRuntimeMessage({
@@ -535,7 +535,7 @@
       }
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
   async function uploadErpFile(input) {
     const maxBytes = 4 * 1024 * 1024;
@@ -564,7 +564,7 @@
       }
       return { ok: false, error: response.error };
     }
-    return { ok: false, error: "Reload this page — Giya was updated." };
+    return { ok: false, error: "Reload this page — Faye was updated." };
   }
 
   // src/content/env-specs.ts
@@ -828,16 +828,16 @@
       <div class="space-y-3">
         <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Concern</p>
-          <p class="mt-0.5 font-mono text-[10px] font-semibold text-sky-700">${escapeHtml(concern.name)}</p>
+          <p class="mt-0.5 font-mono text-[10px] font-semibold text-neutral-700">${escapeHtml(concern.name)}</p>
           <p class="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-900">${escapeHtml(concern.subject)}</p>
-          <button type="button" data-change-concern class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
+          <button type="button" data-change-concern class="mt-2 text-xs font-medium text-neutral-700 underline-offset-2 hover:underline">
             Change concern
           </button>
         </div>
         <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Pinned to</p>
           <p class="mt-0.5 break-all text-xs font-medium text-neutral-900">${escapeHtml(picked.label)}</p>
-          <button type="button" data-retarget class="mt-2 text-xs font-medium text-sky-700 hover:text-sky-900">
+          <button type="button" data-retarget class="mt-2 text-xs font-medium text-neutral-700 underline-offset-2 hover:underline">
             Change element
           </button>
         </div>
@@ -847,7 +847,7 @@
           <button
             type="button"
             data-comment-submit
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-md transition hover:bg-sky-600"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-white shadow-md transition hover:bg-neutral-800"
             aria-label="Send comment"
           >
             ${ICONS.send}
@@ -1032,7 +1032,7 @@
     els.panelBody.innerHTML = otpMode ? `
       <div class="space-y-3">
         <p class="text-xs leading-relaxed text-neutral-600">
-          Enter the verification code sent to your email (same as Giya AI / Desk OTP).
+          Enter the verification code sent to your email (same as Desk OTP).
         </p>
         <input
           data-otp
@@ -1050,14 +1050,14 @@
           ${ICONS.login}
           Verify &amp; connect
         </button>
-        <button type="button" data-back-login class="w-full text-xs font-medium text-sky-700 hover:text-sky-900">
+        <button type="button" data-back-login class="w-full text-xs font-medium text-neutral-700 underline-offset-2 hover:underline">
           Back to email / password
         </button>
         <p data-auth-status class="text-xs text-neutral-500"></p>
       </div>` : `
       <div class="space-y-3">
         <p class="text-xs leading-relaxed text-neutral-600">
-          Connect Giya to Livro with your ERP login (explicit session — not silent cookie reuse).
+          Connect Faye to Livro with your ERP login (explicit session — not silent cookie reuse).
         </p>
         <input
           data-email
@@ -1243,7 +1243,7 @@
         const created = await createConcern({
           subject,
           type: typeSelect?.value || "Bugs/Issues",
-          description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
+          description: `<p>Created from Faye on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
         });
         if (!created.ok) {
           if (createStatus)
@@ -1333,7 +1333,7 @@
     return `
     <article
       data-thread-comment="${escapeHtml(item.commentName)}"
-      class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2 ${reply ? "ml-3 border-l-2 border-l-sky-400/60" : ""}"
+      class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2 ${reply ? "ml-3 border-l-2 border-l-neutral-400/70" : ""}"
       style="margin-left:${indent}px"
     >
       <div class="flex items-start gap-2">
@@ -1352,7 +1352,7 @@
           <button
             type="button"
             data-reply-to="${escapeHtml(item.commentName)}"
-            class="text-[11px] font-medium text-sky-700 hover:text-sky-900"
+            class="text-[11px] font-medium text-neutral-700 underline-offset-2 hover:underline"
           >Reply</button>
         </div>
       </div>
@@ -1393,7 +1393,7 @@
             type="button"
             data-resolve
             hidden
-            class="rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-600"
+            class="rounded-full bg-neutral-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-neutral-800"
           >Mark as resolve</button>
         </div>
         <p data-resolve-status class="text-[11px] text-neutral-500"></p>
@@ -1409,7 +1409,7 @@
           <button
             type="button"
             data-reply-submit
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-md transition hover:bg-sky-600"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-white shadow-md transition hover:bg-neutral-800"
             aria-label="Send reply"
           >${ICONS.send}</button>
         </div>
@@ -1433,12 +1433,12 @@
     const paintDevops = (devopsStatus, resolved) => {
       if (resolved) {
         chip.textContent = devopsStatus || "Resolved";
-        chip.className = "rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700";
+        chip.className = "rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white";
         resolveBtn.hidden = true;
         resolveStatus.textContent = "";
       } else {
         chip.textContent = "Not resolved";
-        chip.className = "rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-800";
+        chip.className = "rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-medium text-neutral-800";
         resolveBtn.hidden = false;
       }
     };
@@ -1466,7 +1466,7 @@
     const reloadThread = async () => {
       const result = await listPinThread(root.concernName, threadId);
       if (!result.ok) {
-        listEl.innerHTML = `<p class="text-xs text-rose-600">${escapeHtml(result.error)}</p>`;
+        listEl.innerHTML = `<p class="text-xs text-neutral-600">${escapeHtml(result.error)}</p>`;
         return;
       }
       comments = result.comments.length ? result.comments : [root];
@@ -1566,7 +1566,7 @@
           alt=""
           class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-white"
         />
-        <span class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-sky-500 text-[10px] font-bold leading-none text-white ring-2 ring-white">+</span>
+        <span class="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full bg-neutral-900 text-[10px] font-bold leading-none text-white ring-2 ring-white">+</span>
       </div>
     `;
     const img = wrap.querySelector("img");
@@ -1605,7 +1605,7 @@
       const avatar = isMe ? avatarUrl : fallback;
       pin.innerHTML = `
         <button type="button" class="relative h-8 w-8" aria-label="Open pin comment">
-          <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-sky-400" />
+          <img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full object-cover shadow-lg ring-2 ring-neutral-900" />
         </button>
       `;
       const img = pin.querySelector("img");
@@ -1643,7 +1643,7 @@
 
       <div
         data-highlight
-        class="pointer-events-none fixed z-1 rounded-md border-2 border-sky-400 bg-sky-400/15 opacity-0 transition-opacity duration-75"
+        class="pointer-events-none fixed z-1 rounded-md border-2 border-neutral-900 bg-neutral-900/10 opacity-0 transition-opacity duration-75"
         hidden
       ></div>
 
@@ -1661,7 +1661,7 @@
         data-dock
         class="pointer-events-auto fixed z-3 flex flex-col items-center gap-1 rounded-full border border-white/50 bg-white/55 p-1.5 shadow-lg shadow-black/10 backdrop-blur-xl transition duration-200 ease-out scale-95 opacity-0"
         role="toolbar"
-        aria-label="Giya"
+        aria-label="Faye"
         hidden
       >
         <button type="button" data-nav class="${ICON_BTN_CLASS}" aria-label="Concerns" title="Concerns" data-active="false" data-mode="concerns">
@@ -1685,7 +1685,7 @@
         data-panel
         class="pointer-events-auto fixed z-4 flex flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/70 text-neutral-900 shadow-xl shadow-black/10 backdrop-blur-2xl transition duration-200 ease-out scale-95 opacity-0"
         role="dialog"
-        aria-label="Giya panel"
+        aria-label="Faye panel"
         hidden
       >
         <header data-panel-header class="flex shrink-0 cursor-grab items-center gap-2 border-b border-black/5 px-3 py-2 active:cursor-grabbing touch-none select-none">
@@ -1709,7 +1709,7 @@
         type="button"
         data-fab
         class="pointer-events-auto fixed z-2 grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-black p-0 shadow-md transition-transform duration-150 ease-out hover:scale-105 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black cursor-grab active:cursor-grabbing touch-none select-none"
-        aria-label="Open Giya"
+        aria-label="Open Faye"
         aria-expanded="false"
       >
         <img data-fab-icon class="pointer-events-none h-4 w-4 rounded-full object-cover" alt="" draggable="false" />
@@ -2277,7 +2277,7 @@
       }
       const { backdrop, dock, fab } = els;
       fab.setAttribute("aria-expanded", String(this.open));
-      fab.setAttribute("aria-label", this.open ? "Close Giya" : "Open Giya");
+      fab.setAttribute("aria-label", this.open ? "Close Faye" : "Open Faye");
       fab.hidden = this.open;
       fab.classList.toggle("opacity-0", this.open);
       if (this.open) {
@@ -2906,5 +2906,5 @@
   }
 })();
 
-//# debugId=E3C591D0ADA356C864756E2164756E21
+//# debugId=0665C9BC7490934A64756E2164756E21
 //# sourceMappingURL=widget.js.map

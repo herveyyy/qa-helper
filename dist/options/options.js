@@ -109,7 +109,7 @@
       urlInput.value = "";
       fileInput.value = "";
       await refreshPreview();
-      setStatus("Reset to the default Giya logo.");
+      setStatus("Reset to the default Faye logo.");
     })();
   });
   originAddBtn.addEventListener("click", () => {
@@ -147,5 +147,5 @@
   refreshOrigins();
 })();
 
-//# debugId=B9A1A9148EE80ADC64756E2164756E21
+//# debugId=4F340C0FE1C447CD64756E2164756E21
 //# sourceMappingURL=options.js.map

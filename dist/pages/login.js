@@ -46,7 +46,7 @@
     if (response?.type !== "SESSION") {
       signedIn.classList.add("hidden");
       signedOut.classList.remove("hidden");
-      setStatus("Reload this page — Giya was updated.");
+      setStatus("Reload this page — Faye was updated.");
       return;
     }
     if (response.ok) {
@@ -79,5 +79,5 @@
   refresh(true);
 })();
 
-//# debugId=1177778F6DC2F8FC64756E2164756E21
+//# debugId=D731CEF14A3A26CF64756E2164756E21
 //# sourceMappingURL=login.js.map
