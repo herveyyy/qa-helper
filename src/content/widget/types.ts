@@ -14,6 +14,7 @@ export interface WidgetElements {
   pickHint: HTMLDivElement;
   pinLayer: HTMLDivElement;
   fab: HTMLButtonElement;
+  fabLogo: HTMLElement;
   fabIcon: HTMLImageElement;
   btnNav: HTMLButtonElement;
   btnEnv: HTMLButtonElement;

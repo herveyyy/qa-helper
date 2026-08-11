@@ -1,3 +1,4 @@
+import { fayeLogoDataUrl } from "../shared/brand.ts";
 import { sendRuntimeMessage } from "../shared/runtime_message.ts";
 
 const loadingEl = document.getElementById("loading")!;
@@ -14,7 +15,7 @@ const refreshBtn = document.getElementById("refresh")!;
 const closeBtn = document.getElementById("close-tab")!;
 const goLoginBtn = document.getElementById("go-login")!;
 
-const FALLBACK_AVATAR = chrome.runtime.getURL("assets/giya-icon.png");
+const FALLBACK_AVATAR = fayeLogoDataUrl();
 
 function setStatus(message: string): void {
   statusEl.textContent = message;

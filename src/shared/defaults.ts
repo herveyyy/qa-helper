@@ -1,3 +1,4 @@
+import { fayeLogoDataUrl } from "./brand.ts";
 import type { FabPosition, StoredSettings } from "./types.ts";
 
 export const DEFAULT_POSITION: FabPosition = "bottom-right";
@@ -27,5 +28,5 @@ export const STORAGE_DEFAULTS: StoredSettings = {
 };
 
 export function defaultIconUrl(): string {
-  return chrome.runtime.getURL("assets/giya-icon.png");
+  return fayeLogoDataUrl();
 }

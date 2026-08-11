@@ -136,6 +136,7 @@ export class FloatingWidget {
       pickHint: requireEl<HTMLDivElement>(root, "[data-pick-hint]"),
       pinLayer: requireEl<HTMLDivElement>(root, "[data-pin-layer]"),
       fab: requireEl<HTMLButtonElement>(root, "[data-fab]"),
+      fabLogo: requireEl<HTMLElement>(root, "[data-fab-logo]"),
       fabIcon: requireEl<HTMLImageElement>(root, "[data-fab-icon]"),
       btnNav: requireEl<HTMLButtonElement>(root, "[data-nav]"),
       btnEnv: requireEl<HTMLButtonElement>(root, "[data-env]"),
@@ -464,8 +465,11 @@ export class FloatingWidget {
   applyIcon(iconUrl: string): void {
     const els = this.els;
     if (!els) return;
-    this.config.iconUrl = iconUrl || defaultIconUrl();
-    els.fabIcon.src = this.config.iconUrl;
+    const custom = Boolean(iconUrl && iconUrl.trim());
+    this.config.iconUrl = custom ? iconUrl : defaultIconUrl();
+    els.fabLogo.hidden = custom;
+    els.fabIcon.hidden = !custom;
+    if (custom) els.fabIcon.src = iconUrl;
   }
 
   applyFabCoords(coords: FabCoords): void {
