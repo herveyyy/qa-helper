@@ -10,11 +10,17 @@ import {
   fetchUserProfile,
   peekSid,
 } from "./auth-client.ts";
-import { addConcernPin, listConcerns, listPagePins } from "./concern-client.ts";
+import {
+  addConcernPin,
+  createConcern,
+  listConcerns,
+  listPagePins,
+} from "./concern-client.ts";
 import { HOST_ID } from "./constants.ts";
 import { ElementPicker, type PickedElement } from "./element-picker.ts";
 import { collectEnvSpecs } from "./env-specs.ts";
 import { ICONS } from "./icons.ts";
+import { isUrlAllowed } from "../shared/allowed_origins.ts";
 import {
   DEFAULT_POSITION,
   DEFAULT_SIDEBAR_WIDTH,
@@ -1348,16 +1354,13 @@ class FloatingWidget {
       }
     }
 
-    if (result.concerns.length === 0) {
-      els.panelBody.innerHTML = `
-        <p class="text-xs leading-relaxed text-neutral-600">
-          No open concerns for you as <span class="font-medium">current assignee</span> on the latest sprint.
-        </p>`;
-      return;
-    }
-
     const sprintLabel = result.concerns[0]?.sprintAssign || "latest sprint";
-    els.panelBody.innerHTML = `
+    const listMarkup =
+      result.concerns.length === 0
+        ? `<p class="text-xs leading-relaxed text-neutral-600">
+            No open concerns yet. Create one below for QA on this page.
+          </p>`
+        : `
       <p class="mb-2 text-xs text-neutral-500">
         ${escapeHtml(sprintLabel)} · current assignee. Pick a concern, then pin a UI element.
       </p>
@@ -1378,8 +1381,83 @@ class FloatingWidget {
           </li>`
           )
           .join("")}
-      </ul>
+      </ul>`;
+
+    els.panelBody.innerHTML = `
+      <div class="mb-3 space-y-2 rounded-xl border border-black/8 bg-white/50 p-2.5">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Quick SPB</p>
+        <input
+          type="text"
+          data-create-subject
+          placeholder="Subject (e.g. QA: pin misaligned on …)"
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
+        />
+        <div class="flex gap-2">
+          <select
+            data-create-type
+            class="min-w-0 flex-1 rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
+          >
+            <option value="Bugs/Issues" selected>Bugs/Issues</option>
+            <option value="Feature Request">Feature Request</option>
+          </select>
+          <button
+            type="button"
+            data-create-spb
+            class="shrink-0 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
+          >
+            Create
+          </button>
+        </div>
+        <p data-create-status class="min-h-4 text-[10px] text-neutral-500"></p>
+      </div>
+      ${listMarkup}
     `;
+
+    const subjectInput = els.panelBody.querySelector(
+      "[data-create-subject]"
+    ) as HTMLInputElement | null;
+    const typeSelect = els.panelBody.querySelector(
+      "[data-create-type]"
+    ) as HTMLSelectElement | null;
+    const createBtn = els.panelBody.querySelector(
+      "[data-create-spb]"
+    ) as HTMLButtonElement | null;
+    const createStatus = els.panelBody.querySelector(
+      "[data-create-status]"
+    ) as HTMLParagraphElement | null;
+
+    const runCreate = () => {
+      void (async () => {
+        const subject = subjectInput?.value.trim() || "";
+        if (!subject) {
+          if (createStatus) createStatus.textContent = "Enter a subject.";
+          return;
+        }
+        if (createBtn) createBtn.disabled = true;
+        if (createStatus) createStatus.textContent = "Creating…";
+        const created = await createConcern({
+          subject,
+          type: typeSelect?.value || "Bugs/Issues",
+          description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`,
+        });
+        if (!created.ok) {
+          if (createStatus) createStatus.textContent = created.error;
+          if (createBtn) createBtn.disabled = false;
+          return;
+        }
+        this.selectedConcern = created.concern;
+        this.picked = null;
+        this.startPicker();
+      })();
+    };
+
+    createBtn?.addEventListener("click", runCreate);
+    subjectInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runCreate();
+      }
+    });
 
     for (const btn of els.panelBody.querySelectorAll<HTMLButtonElement>("[data-concern]")) {
       btn.addEventListener("click", () => {
@@ -1758,12 +1836,28 @@ async function boot(): Promise<void> {
     return;
   }
 
+  const stored = await chrome.storage.sync.get(STORAGE_DEFAULTS);
+  const allowed =
+    Array.isArray(stored.allowedOrigins) && stored.allowedOrigins.length > 0
+      ? (stored.allowedOrigins as string[])
+      : STORAGE_DEFAULTS.allowedOrigins;
+  if (!isUrlAllowed(location.href, allowed)) return;
+
   const config = await loadConfig();
   const widget = new FloatingWidget(config);
   await widget.mount();
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!chrome.runtime?.id || area !== "sync") return;
+    if (changes.allowedOrigins) {
+      const next = Array.isArray(changes.allowedOrigins.newValue)
+        ? (changes.allowedOrigins.newValue as string[])
+        : STORAGE_DEFAULTS.allowedOrigins;
+      if (!isUrlAllowed(location.href, next)) {
+        document.getElementById(HOST_ID)?.remove();
+        return;
+      }
+    }
     widget.updateFromStorage(changes);
   });
 }

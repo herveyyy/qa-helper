@@ -37,6 +37,26 @@ export async function listConcerns(): Promise<
   return { ok: false, error: "Reload this page — Giya was updated." };
 }
 
+export async function createConcern(input: {
+  subject: string;
+  type?: string;
+  priority?: string;
+  description?: string;
+}): Promise<{ ok: true; concern: Concern } | { ok: false; error: string }> {
+  const response = await sendMessage({
+    type: "CREATE_CONCERN",
+    subject: input.subject,
+    concernType: input.type,
+    priority: input.priority,
+    description: input.description,
+  });
+  if (response?.type === "CONCERN_CREATED") {
+    if (response.ok) return { ok: true, concern: response.concern };
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Giya was updated." };
+}
+
 export async function listPagePins(href: string): Promise<
   { ok: true; pins: GiyaPinComment[] } | { ok: false; error: string }
 > {

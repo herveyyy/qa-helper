@@ -7,6 +7,8 @@ export const DOCK_WIDTH = 44;
 export const FAB_MARGIN = 16;
 export const DRAG_THRESHOLD_PX = 4;
 
+export const DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
+
 export const STORAGE_DEFAULTS: StoredSettings = {
   iconUrl: "",
   position: DEFAULT_POSITION,
@@ -14,6 +16,7 @@ export const STORAGE_DEFAULTS: StoredSettings = {
   fabLeft: null,
   fabTop: null,
   pinned: false,
+  allowedOrigins: DEFAULT_ALLOWED_ORIGINS,
 };
 
 export function defaultIconUrl(): string {

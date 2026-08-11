@@ -11,6 +11,7 @@ import {
 } from "../../lib/domain/services/auth.service";
 import {
   addConcernPinComment,
+  createAssigneeConcern,
   invalidateConcernCaches,
   listAssigneeConcerns,
   listPagePinComments,
@@ -132,6 +133,23 @@ chrome.runtime.onMessage.addListener((message: ExtensionRequest, _sender, sendRe
       const response: ExtensionResponse = result.ok
         ? { type: "CONCERNS", ok: true, concerns: result.data }
         : { type: "CONCERNS", ok: false, error: result.error };
+      sendResponse(response);
+      return;
+    }
+
+    if (message.type === "CREATE_CONCERN") {
+      const result = await createAssigneeConcern(
+        {
+          subject: message.subject,
+          type: message.concernType,
+          priority: message.priority,
+          description: message.description,
+        },
+        ERP_BASE_URL
+      );
+      const response: ExtensionResponse = result.ok
+        ? { type: "CONCERN_CREATED", ok: true, concern: result.data }
+        : { type: "CONCERN_CREATED", ok: false, error: result.error };
       sendResponse(response);
       return;
     }

@@ -22,6 +22,13 @@ export type ExtensionRequest =
   | { type: "DISCONNECT_ERP" }
   | { type: "GET_USER_PROFILE" }
   | { type: "LIST_CONCERNS" }
+  | {
+      type: "CREATE_CONCERN";
+      subject: string;
+      concernType?: string;
+      priority?: string;
+      description?: string;
+    }
   | { type: "LIST_PAGE_PINS"; href: string }
   | { type: "ADD_CONCERN_PIN"; concernName: string; pin: GiyaPinPayload }
   | { type: "OPEN_LOGIN_PAGE" }
@@ -53,6 +60,8 @@ export type ExtensionResponse =
   | { type: "USER_PROFILE"; ok: false; error: string }
   | { type: "CONCERNS"; ok: true; concerns: Concern[] }
   | { type: "CONCERNS"; ok: false; error: string }
+  | { type: "CONCERN_CREATED"; ok: true; concern: Concern }
+  | { type: "CONCERN_CREATED"; ok: false; error: string }
   | { type: "PAGE_PINS"; ok: true; pins: GiyaPinComment[] }
   | { type: "PAGE_PINS"; ok: false; error: string }
   | { type: "PIN_SAVED"; ok: true; commentName: string }

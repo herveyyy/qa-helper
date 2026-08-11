@@ -6,6 +6,10 @@ import type {
 } from "../../entities/concern.type";
 import { ERP_BASE_URL } from "../../entities/erpnext.type";
 import { getExtensionSession } from "../usecases/auth/get_extension_session.usecase";
+import {
+  createAssigneeConcern as createAssigneeConcernUseCase,
+  type CreateConcernInput,
+} from "../usecases/concern/create_assignee_concern.usecase";
 import { addConcernPinComment as addConcernPinCommentUseCase } from "../usecases/concern/add_concern_pin_comment.usecase";
 import { listAssigneeConcerns as listAssigneeConcernsUseCase } from "../usecases/concern/list_assignee_concerns.usecase";
 import { listPagePinComments as listPagePinCommentsUseCase } from "../usecases/concern/list_page_pin_comments.usecase";
@@ -56,6 +60,15 @@ export async function listAssigneeConcerns(
     concernsCache = { at: Date.now(), data: result.data };
     concernsCacheEmail = email;
   }
+  return result;
+}
+
+export async function createAssigneeConcern(
+  input: CreateConcernInput,
+  baseUrl: string = ERP_BASE_URL
+): Promise<ConcernResult<Concern>> {
+  const result = await createAssigneeConcernUseCase(input, baseUrl);
+  if (result.ok) invalidateConcernCaches();
   return result;
 }
 

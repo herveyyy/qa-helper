@@ -460,6 +460,110 @@
     await clearGiyaConnection();
   }
 
+  // lib/domain/usecases/concern/get_latest_sprint_assign.usecase.ts
+  async function getLatestSprintAssign(baseUrl) {
+    try {
+      const res = await erpFetch(`${baseUrl}/api/method/frappe.client.get_list`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctype: "Sprint",
+          fields: ["name"],
+          order_by: "creation desc",
+          limit_page_length: 1
+        })
+      }, 12000);
+      if (!res.ok) {
+        return { ok: false, error: `Could not load latest sprint (${res.status}).` };
+      }
+      const json = await res.json();
+      const name = Array.isArray(json.message) ? json.message[0]?.name?.trim() : "";
+      if (!name) {
+        return { ok: false, error: "No Sprint found." };
+      }
+      return { ok: true, data: name };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to resolve latest sprint.")
+      };
+    }
+  }
+
+  // lib/domain/usecases/concern/create_assignee_concern.usecase.ts
+  async function createAssigneeConcern(input, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl);
+    if (!site)
+      return { ok: false, error: "Invalid ERP URL." };
+    const subject = input.subject.trim();
+    if (!subject)
+      return { ok: false, error: "Subject is required." };
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const sprint = await getLatestSprintAssign(site);
+    if (!sprint.ok)
+      return sprint;
+    const email = session.data.email;
+    const type = (input.type || "Bugs/Issues").trim() || "Bugs/Issues";
+    const priority = (input.priority || "Medium").trim() || "Medium";
+    try {
+      const res = await erpFetch(`${site}/api/method/frappe.client.insert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doc: {
+            doctype: "Sprint Backlogs",
+            subject,
+            type,
+            status: "Open",
+            priority,
+            module: "RND",
+            sprint_assign: sprint.data,
+            sprint_points: "1",
+            dev_assignee: email,
+            current_assignee: email,
+            description: input.description?.trim() || undefined
+          }
+        })
+      }, 20000);
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const errJson = await res.json();
+          detail = errJson.message || "";
+        } catch {}
+        return {
+          ok: false,
+          error: detail || `Could not create SPB (${res.status}).`
+        };
+      }
+      const json = await res.json();
+      const doc = json.message;
+      if (!doc?.name) {
+        return { ok: false, error: "SPB created but name was missing." };
+      }
+      return {
+        ok: true,
+        data: {
+          name: String(doc.name),
+          subject: String(doc.subject || subject),
+          status: String(doc.status || "Open"),
+          type: String(doc.type || type),
+          priority: String(doc.priority || priority),
+          sprintAssign: doc.sprint_assign || sprint.data,
+          devAssignee: doc.dev_assignee || email,
+          currentAssignee: doc.current_assignee || email
+        }
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to create SPB.")
+      };
+    }
+  }
+
   // lib/domain/usecases/erpnext/fetch_erp_image_data_url.usecase.ts
   async function fetchErpImageDataUrl(url, timeoutMs = 8000) {
     if (!url || url.startsWith("data:"))
@@ -670,36 +774,6 @@
     }
   }
 
-  // lib/domain/usecases/concern/get_latest_sprint_assign.usecase.ts
-  async function getLatestSprintAssign(baseUrl) {
-    try {
-      const res = await erpFetch(`${baseUrl}/api/method/frappe.client.get_list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Sprint",
-          fields: ["name"],
-          order_by: "creation desc",
-          limit_page_length: 1
-        })
-      }, 12000);
-      if (!res.ok) {
-        return { ok: false, error: `Could not load latest sprint (${res.status}).` };
-      }
-      const json = await res.json();
-      const name = Array.isArray(json.message) ? json.message[0]?.name?.trim() : "";
-      if (!name) {
-        return { ok: false, error: "No Sprint found." };
-      }
-      return { ok: true, data: name };
-    } catch (error) {
-      return {
-        ok: false,
-        error: erpErrorMessage(error, "Failed to resolve latest sprint.")
-      };
-    }
-  }
-
   // lib/domain/usecases/concern/list_assignee_concerns.usecase.ts
   async function listAssigneeConcerns(baseUrl = ERP_BASE_URL) {
     const site = normalizeErpBaseUrl(baseUrl);
@@ -876,6 +950,12 @@
     }
     return result;
   }
+  async function createAssigneeConcern2(input, baseUrl = ERP_BASE_URL) {
+    const result = await createAssigneeConcern(input, baseUrl);
+    if (result.ok)
+      invalidateConcernCaches();
+    return result;
+  }
   async function addConcernPinComment2(concernName, pin, baseUrl = ERP_BASE_URL) {
     const result = await addConcernPinComment(concernName, pin, baseUrl);
     if (result.ok)
@@ -961,13 +1041,15 @@
   // src/shared/defaults.ts
   var DEFAULT_POSITION = "bottom-right";
   var DEFAULT_SIDEBAR_WIDTH = 360;
+  var DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
   var STORAGE_DEFAULTS = {
     iconUrl: "",
     position: DEFAULT_POSITION,
     sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
     fabLeft: null,
     fabTop: null,
-    pinned: false
+    pinned: false,
+    allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
 
   // src/background/service-worker.ts
@@ -1067,6 +1149,17 @@
         sendResponse(response);
         return;
       }
+      if (message.type === "CREATE_CONCERN") {
+        const result = await createAssigneeConcern2({
+          subject: message.subject,
+          type: message.concernType,
+          priority: message.priority,
+          description: message.description
+        }, ERP_BASE_URL);
+        const response = result.ok ? { type: "CONCERN_CREATED", ok: true, concern: result.data } : { type: "CONCERN_CREATED", ok: false, error: result.error };
+        sendResponse(response);
+        return;
+      }
       if (message.type === "LIST_PAGE_PINS") {
         const result = await listPagePinComments2(message.href, ERP_BASE_URL);
         const response = result.ok ? { type: "PAGE_PINS", ok: true, pins: result.data } : { type: "PAGE_PINS", ok: false, error: result.error };
@@ -1129,5 +1222,5 @@
   });
 })();
 
-//# debugId=E3860395D486356A64756E2164756E21
+//# debugId=E88539B02764192C64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

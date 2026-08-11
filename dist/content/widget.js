@@ -116,6 +116,21 @@
     }
     return { ok: false, error: "Reload this page — Giya was updated." };
   }
+  async function createConcern(input) {
+    const response = await sendMessage2({
+      type: "CREATE_CONCERN",
+      subject: input.subject,
+      concernType: input.type,
+      priority: input.priority,
+      description: input.description
+    });
+    if (response?.type === "CONCERN_CREATED") {
+      if (response.ok)
+        return { ok: true, concern: response.concern };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Giya was updated." };
+  }
   async function listPagePins(href) {
     const response = await sendMessage2({ type: "LIST_PAGE_PINS", href });
     if (response?.type === "PAGE_PINS") {
@@ -349,6 +364,42 @@
     spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
   };
 
+  // src/shared/allowed_origins.ts
+  function isUrlAllowed(pageUrl, patterns) {
+    if (!patterns.length)
+      return false;
+    let hostname;
+    let origin;
+    try {
+      const u = new URL(pageUrl);
+      hostname = u.hostname.toLowerCase();
+      origin = u.origin.toLowerCase();
+    } catch {
+      return false;
+    }
+    return patterns.some((raw) => matchesPattern(hostname, origin, raw.trim()));
+  }
+  function matchesPattern(hostname, origin, pattern) {
+    if (!pattern)
+      return false;
+    const lower = pattern.toLowerCase();
+    if (lower.includes("://")) {
+      try {
+        const p = new URL(lower);
+        return origin === p.origin.toLowerCase();
+      } catch {
+        return false;
+      }
+    }
+    if (lower.startsWith("*.")) {
+      const base = lower.slice(2);
+      if (!base)
+        return false;
+      return hostname === base || hostname.endsWith(`.${base}`);
+    }
+    return hostname === lower || hostname.endsWith(`.${lower}`);
+  }
+
   // src/shared/defaults.ts
   var DEFAULT_POSITION = "bottom-right";
   var DEFAULT_SIDEBAR_WIDTH = 360;
@@ -356,13 +407,15 @@
   var DOCK_WIDTH = 44;
   var FAB_MARGIN = 16;
   var DRAG_THRESHOLD_PX = 4;
+  var DEFAULT_ALLOWED_ORIGINS = ["wela.dev"];
   var STORAGE_DEFAULTS = {
     iconUrl: "",
     position: DEFAULT_POSITION,
     sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
     fabLeft: null,
     fabTop: null,
-    pinned: false
+    pinned: false,
+    allowedOrigins: DEFAULT_ALLOWED_ORIGINS
   };
   function defaultIconUrl() {
     return chrome.runtime.getURL("assets/giya-icon.png");
@@ -1527,15 +1580,10 @@
           return;
         }
       }
-      if (result.concerns.length === 0) {
-        els.panelBody.innerHTML = `
-        <p class="text-xs leading-relaxed text-neutral-600">
-          No open concerns for you as <span class="font-medium">current assignee</span> on the latest sprint.
-        </p>`;
-        return;
-      }
       const sprintLabel = result.concerns[0]?.sprintAssign || "latest sprint";
-      els.panelBody.innerHTML = `
+      const listMarkup = result.concerns.length === 0 ? `<p class="text-xs leading-relaxed text-neutral-600">
+            No open concerns yet. Create one below for QA on this page.
+          </p>` : `
       <p class="mb-2 text-xs text-neutral-500">
         ${escapeHtml(sprintLabel)} · current assignee. Pick a concern, then pin a UI element.
       </p>
@@ -1552,8 +1600,76 @@
               <p class="mt-1 text-[10px] text-neutral-500">${escapeHtml(c.type)} · ${escapeHtml(c.status)}${c.sprintAssign ? ` · ${escapeHtml(c.sprintAssign)}` : ""}</p>
             </button>
           </li>`).join("")}
-      </ul>
+      </ul>`;
+      els.panelBody.innerHTML = `
+      <div class="mb-3 space-y-2 rounded-xl border border-black/8 bg-white/50 p-2.5">
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Quick SPB</p>
+        <input
+          type="text"
+          data-create-subject
+          placeholder="Subject (e.g. QA: pin misaligned on …)"
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2.5 py-1.5 text-xs text-neutral-900 outline-none ring-neutral-900 placeholder:text-neutral-400 focus:ring-2"
+        />
+        <div class="flex gap-2">
+          <select
+            data-create-type
+            class="min-w-0 flex-1 rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
+          >
+            <option value="Bugs/Issues" selected>Bugs/Issues</option>
+            <option value="Feature Request">Feature Request</option>
+          </select>
+          <button
+            type="button"
+            data-create-spb
+            class="shrink-0 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
+          >
+            Create
+          </button>
+        </div>
+        <p data-create-status class="min-h-4 text-[10px] text-neutral-500"></p>
+      </div>
+      ${listMarkup}
     `;
+      const subjectInput = els.panelBody.querySelector("[data-create-subject]");
+      const typeSelect = els.panelBody.querySelector("[data-create-type]");
+      const createBtn = els.panelBody.querySelector("[data-create-spb]");
+      const createStatus = els.panelBody.querySelector("[data-create-status]");
+      const runCreate = () => {
+        (async () => {
+          const subject = subjectInput?.value.trim() || "";
+          if (!subject) {
+            if (createStatus)
+              createStatus.textContent = "Enter a subject.";
+            return;
+          }
+          if (createBtn)
+            createBtn.disabled = true;
+          if (createStatus)
+            createStatus.textContent = "Creating…";
+          const created = await createConcern({
+            subject,
+            type: typeSelect?.value || "Bugs/Issues",
+            description: `<p>Created from Giya on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
+          });
+          if (!created.ok) {
+            if (createStatus)
+              createStatus.textContent = created.error;
+            if (createBtn)
+              createBtn.disabled = false;
+            return;
+          }
+          this.selectedConcern = created.concern;
+          this.picked = null;
+          this.startPicker();
+        })();
+      };
+      createBtn?.addEventListener("click", runCreate);
+      subjectInput?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          runCreate();
+        }
+      });
       for (const btn of els.panelBody.querySelectorAll("[data-concern]")) {
         btn.addEventListener("click", () => {
           const name = btn.dataset.concern;
@@ -1900,12 +2016,23 @@
     } catch {
       return;
     }
+    const stored = await chrome.storage.sync.get(STORAGE_DEFAULTS);
+    const allowed = Array.isArray(stored.allowedOrigins) && stored.allowedOrigins.length > 0 ? stored.allowedOrigins : STORAGE_DEFAULTS.allowedOrigins;
+    if (!isUrlAllowed(location.href, allowed))
+      return;
     const config = await loadConfig();
     const widget = new FloatingWidget(config);
     await widget.mount();
     chrome.storage.onChanged.addListener((changes, area) => {
       if (!chrome.runtime?.id || area !== "sync")
         return;
+      if (changes.allowedOrigins) {
+        const next = Array.isArray(changes.allowedOrigins.newValue) ? changes.allowedOrigins.newValue : STORAGE_DEFAULTS.allowedOrigins;
+        if (!isUrlAllowed(location.href, next)) {
+          document.getElementById(HOST_ID)?.remove();
+          return;
+        }
+      }
       widget.updateFromStorage(changes);
     });
   }
@@ -1918,5 +2045,5 @@
   }
 })();
 
-//# debugId=6700E6722A2AAFF764756E2164756E21
+//# debugId=2F4D06C6C92F83A664756E2164756E21
 //# sourceMappingURL=widget.js.map

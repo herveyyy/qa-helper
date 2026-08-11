@@ -29,4 +29,6 @@ export interface StoredSettings {
   fabLeft: number | null;
   fabTop: number | null;
   pinned: boolean;
+  /** Host/origin patterns where the widget may mount (e.g. `wela.dev`, `*.livro.systems`). */
+  allowedOrigins: string[];
 }
