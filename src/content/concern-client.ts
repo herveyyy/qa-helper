@@ -63,6 +63,68 @@ export async function addConcernPin(
   return { ok: false, error: "Reload this page — Giya was updated." };
 }
 
+export async function listPinThread(
+  concernName: string,
+  threadId: string
+): Promise<{ ok: true; comments: GiyaPinComment[] } | { ok: false; error: string }> {
+  const response = await sendRuntimeMessage({
+    type: "LIST_PIN_THREAD",
+    concernName,
+    threadId,
+  });
+  if (response?.type === "PIN_THREAD") {
+    if (response.ok) return { ok: true, comments: response.comments };
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Giya was updated." };
+}
+
+export async function getConcernDevops(
+  concernName: string
+): Promise<
+  | { ok: true; devopsStatus: string; resolved: boolean }
+  | { ok: false; error: string }
+> {
+  const response = await sendRuntimeMessage({
+    type: "GET_CONCERN_DEVOPS",
+    concernName,
+  });
+  if (response?.type === "CONCERN_DEVOPS") {
+    if (response.ok) {
+      return {
+        ok: true,
+        devopsStatus: response.devopsStatus,
+        resolved: response.resolved,
+      };
+    }
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Giya was updated." };
+}
+
+export async function resolveConcern(
+  concernName: string
+): Promise<
+  | { ok: true; devopsStatus: string; resolved: boolean }
+  | { ok: false; error: string }
+> {
+  const response = await sendRuntimeMessage({
+    type: "RESOLVE_CONCERN",
+    concernName,
+  });
+  if (response?.type === "CONCERN_DEVOPS") {
+    if (response.ok) {
+      return {
+        ok: true,
+        devopsStatus: response.devopsStatus,
+        resolved: response.resolved,
+      };
+    }
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Giya was updated." };
+}
+
 export async function uploadErpFile(input: {
   file: File;
   doctype?: string;

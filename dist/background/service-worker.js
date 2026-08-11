@@ -953,6 +953,95 @@
     }
   }
 
+  // lib/domain/usecases/concern/get_concern_devops_status.usecase.ts
+  function isDevopsResolved(status) {
+    return Boolean(String(status || "").trim());
+  }
+  async function getConcernDevopsStatus(concernName, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const name = concernName.trim();
+    if (!name)
+      return { ok: false, error: "Missing concern." };
+    try {
+      const params = new URLSearchParams({
+        doctype: "Sprint Backlogs",
+        fields: JSON.stringify(["name", "devops_status"]),
+        filters: JSON.stringify([["name", "=", name]]),
+        limit_page_length: "1"
+      });
+      const res = await erpFetch(`${site}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 12000);
+      if (!res.ok) {
+        return { ok: false, error: `Could not read status (${res.status}).` };
+      }
+      const json = await res.json();
+      if (json.exc) {
+        return { ok: false, error: "Could not read DevOps status." };
+      }
+      const row = Array.isArray(json.message) ? json.message[0] : undefined;
+      const devopsStatus = String(row?.devops_status || "").trim();
+      return {
+        ok: true,
+        data: {
+          devopsStatus,
+          resolved: isDevopsResolved(devopsStatus)
+        }
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to read DevOps status.")
+      };
+    }
+  }
+  async function resolveConcernForStaging(concernName, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const name = concernName.trim();
+    if (!name)
+      return { ok: false, error: "Missing concern." };
+    const current = await getConcernDevopsStatus(name, site);
+    if (!current.ok)
+      return current;
+    if (current.data.resolved)
+      return { ok: true, data: current.data };
+    try {
+      const res = await erpFetch(`${site}/api/method/frappe.client.set_value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctype: "Sprint Backlogs",
+          name,
+          fieldname: "devops_status",
+          value: "For Staging Update"
+        })
+      });
+      if (!res.ok) {
+        return { ok: false, error: `Could not resolve (${res.status}).` };
+      }
+      const json = await res.json();
+      if (json.exc) {
+        return { ok: false, error: "Could not update DevOps status." };
+      }
+      return {
+        ok: true,
+        data: {
+          devopsStatus: "For Staging Update",
+          resolved: true
+        }
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to mark resolved.")
+      };
+    }
+  }
+
   // lib/domain/usecases/concern/list_assignee_concerns.usecase.ts
   var DONE_STATUSES = new Set(["completed", "cancelled", "closed"]);
   async function listAssigneeConcerns(_baseUrl = ERP_BASE_URL) {
@@ -1038,6 +1127,103 @@
     return "";
   }
 
+  // lib/domain/usecases/concern/list_pin_thread.usecase.ts
+  function pinThreadId(commentName, pin) {
+    return String(pin.threadId || "").trim() || commentName;
+  }
+  function isPinReply(pin) {
+    return Boolean(String(pin.parentId || "").trim());
+  }
+  async function listPinThreadComments(concernName, threadId, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const name = concernName.trim();
+    const tid = threadId.trim();
+    if (!name || !tid)
+      return { ok: false, error: "Missing thread." };
+    try {
+      const params = new URLSearchParams({
+        doctype: "Comment",
+        fields: JSON.stringify([
+          "name",
+          "content",
+          "comment_by",
+          "comment_email",
+          "reference_name",
+          "creation"
+        ]),
+        filters: JSON.stringify([
+          ["reference_doctype", "=", "Sprint Backlogs"],
+          ["comment_type", "=", "Comment"],
+          ["reference_name", "=", name],
+          ["content", "like", "%data-giya-pin%"]
+        ]),
+        order_by: "creation asc",
+        limit_page_length: "100"
+      });
+      const res = await erpFetch(`${site}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 15000);
+      if (!res.ok) {
+        return { ok: false, error: `Could not load thread (${res.status}).` };
+      }
+      const json = await res.json();
+      const rows = Array.isArray(json.message) ? json.message : [];
+      const parsed = [];
+      for (const row of rows) {
+        const pin = parseGiyaPinFromCommentHtml(String(row.content || ""));
+        if (!pin)
+          continue;
+        const commentName = String(row.name || "");
+        if (!commentName)
+          continue;
+        parsed.push({
+          commentName,
+          concernName: name,
+          concernSubject: "",
+          commentBy: String(row.comment_by || row.comment_email || "Someone"),
+          commentEmail: String(row.comment_email || ""),
+          creation: String(row.creation || ""),
+          pin: { ...pin, threadId: pinThreadId(commentName, pin) }
+        });
+      }
+      const byName = new Map(parsed.map((p) => [p.commentName, p]));
+      const inThread = new Set;
+      for (const item of parsed) {
+        if (item.pin.threadId === tid || item.commentName === tid) {
+          inThread.add(item.commentName);
+        }
+      }
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const item of parsed) {
+          if (inThread.has(item.commentName))
+            continue;
+          const parent = String(item.pin.parentId || "");
+          if (parent && inThread.has(parent)) {
+            inThread.add(item.commentName);
+            grew = true;
+          }
+        }
+      }
+      const thread = parsed.filter((p) => inThread.has(p.commentName)).map((p) => ({
+        ...p,
+        pin: { ...p.pin, threadId: tid }
+      }));
+      if (thread.length === 0 && byName.has(tid)) {
+        const root = byName.get(tid);
+        return { ok: true, data: [{ ...root, pin: { ...root.pin, threadId: tid } }] };
+      }
+      return { ok: true, data: thread };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to load discussion.")
+      };
+    }
+  }
+
   // lib/domain/usecases/concern/list_page_pin_comments.usecase.ts
   async function listPagePinComments(pageHref, baseUrl = ERP_BASE_URL, options = {}) {
     const site = normalizeErpBaseUrl(baseUrl);
@@ -1086,22 +1272,30 @@
       const json = await res.json();
       const rows = Array.isArray(json.message) ? json.message : [];
       const pins = [];
+      const seenThreads = new Set;
       for (const row of rows) {
         const pin = parseGiyaPinFromCommentHtml(String(row.content || ""));
         if (!pin || !hrefMatchesPin(pageHref, pin.href))
           continue;
+        if (isPinReply(pin))
+          continue;
+        const commentName = String(row.name || "");
+        const thread = pinThreadId(commentName, pin);
+        if (seenThreads.has(thread))
+          continue;
+        seenThreads.add(thread);
         const concernName = String(row.reference_name || "");
         const concernSubject = byName.get(concernName);
         if (!concernSubject)
           continue;
         pins.push({
-          commentName: String(row.name || ""),
+          commentName,
           concernName,
           concernSubject,
           commentBy: String(row.comment_by || row.comment_email || "Someone"),
           commentEmail: String(row.comment_email || ""),
           creation: String(row.creation || ""),
-          pin
+          pin: { ...pin, threadId: thread }
         });
       }
       return { ok: true, data: pins };
@@ -1223,6 +1417,18 @@
   }
   async function addConcernPinComment2(concernName, pin, baseUrl = ERP_BASE_URL) {
     const result = await addConcernPinComment(concernName, pin, baseUrl);
+    if (result.ok)
+      invalidateConcernCaches();
+    return result;
+  }
+  async function listPinThreadComments2(concernName, threadId, baseUrl = ERP_BASE_URL) {
+    return listPinThreadComments(concernName, threadId, baseUrl);
+  }
+  async function getConcernDevopsStatus2(concernName, baseUrl = ERP_BASE_URL) {
+    return getConcernDevopsStatus(concernName, baseUrl);
+  }
+  async function resolveConcernForStaging2(concernName, baseUrl = ERP_BASE_URL) {
+    const result = await resolveConcernForStaging(concernName, baseUrl);
     if (result.ok)
       invalidateConcernCaches();
     return result;
@@ -1414,6 +1620,28 @@
       const result = await addConcernPinComment2(message.concernName, message.pin, ERP_BASE_URL);
       return result.ok ? { type: "PIN_SAVED", ok: true, commentName: result.data.commentName } : { type: "PIN_SAVED", ok: false, error: result.error };
     }
+    if (message.type === "LIST_PIN_THREAD") {
+      const result = await listPinThreadComments2(message.concernName, message.threadId, ERP_BASE_URL);
+      return result.ok ? { type: "PIN_THREAD", ok: true, comments: result.data } : { type: "PIN_THREAD", ok: false, error: result.error };
+    }
+    if (message.type === "GET_CONCERN_DEVOPS") {
+      const result = await getConcernDevopsStatus2(message.concernName, ERP_BASE_URL);
+      return result.ok ? {
+        type: "CONCERN_DEVOPS",
+        ok: true,
+        devopsStatus: result.data.devopsStatus,
+        resolved: result.data.resolved
+      } : { type: "CONCERN_DEVOPS", ok: false, error: result.error };
+    }
+    if (message.type === "RESOLVE_CONCERN") {
+      const result = await resolveConcernForStaging2(message.concernName, ERP_BASE_URL);
+      return result.ok ? {
+        type: "CONCERN_DEVOPS",
+        ok: true,
+        devopsStatus: result.data.devopsStatus,
+        resolved: result.data.resolved
+      } : { type: "CONCERN_DEVOPS", ok: false, error: result.error };
+    }
     if (message.type === "UPLOAD_ERP_FILE") {
       const result = await uploadErpFile2({
         filename: message.filename,
@@ -1491,5 +1719,5 @@
   });
 })();
 
-//# debugId=F311FE0D0ABEE38B64756E2164756E21
+//# debugId=C57F116AB5094EBC64756E2164756E21
 //# sourceMappingURL=service-worker.js.map

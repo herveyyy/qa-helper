@@ -2,7 +2,6 @@ import type { GiyaPinComment } from "../../../lib/entities/concern.type";
 import type { UserProfile } from "../../../lib/entities/user.type";
 import { listPagePins } from "../concern-client.ts";
 import { ICONS } from "../icons.ts";
-import { sanitizeCommentHtml } from "../../../lib/domain/usecases/concern/sanitize_comment_html.usecase";
 import { avatarFallbackUrl } from "../../shared/avatar.ts";
 import { escapeHtml } from "./dom.ts";
 import type { WidgetElements } from "./types.ts";
@@ -113,18 +112,8 @@ export function renderSavedPins(
   }
 }
 
-/** Read-only pin peek: comment HTML + close. No selector / no Concerns handoff. */
-export function showSavedPinPopout(els: WidgetElements, item: GiyaPinComment): void {
-  els.panelTitle.textContent = item.concernName;
-  const body = sanitizeCommentHtml(item.pin.text);
-  els.panelBody.innerHTML = `
-      <div class="space-y-2">
-        <p class="text-xs font-medium text-neutral-900">${escapeHtml(item.concernSubject)}</p>
-        <p class="text-xs text-neutral-500">${escapeHtml(item.commentBy)}</p>
-        <div class="giya-comment-html rounded-xl border border-black/8 bg-white/60 px-2.5 py-2 text-sm text-neutral-800">${body}</div>
-      </div>
-    `;
-}
+/** Pin discussion: threaded comments + mark as resolve. */
+export { renderPinThreadPanel as showSavedPinPopout } from "./panels/pin-thread.ts";
 
 export async function fetchPagePins(href: string): Promise<GiyaPinComment[]> {
   const result = await listPagePins(href);

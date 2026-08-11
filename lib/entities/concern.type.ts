@@ -8,6 +8,7 @@ export type Concern = {
   sprintAssign: string | null;
   devAssignee: string | null;
   currentAssignee: string | null;
+  devopsStatus?: string | null;
 };
 
 export type GiyaPinEnvSpec = {
@@ -23,6 +24,10 @@ export type GiyaPinPayload = {
   tagName: string;
   /** Frappe Comment HTML (sanitized); may include <img> from Livro uploads. */
   text: string;
+  /** Stable thread id shared by root + replies. */
+  threadId?: string;
+  /** Parent Comment.name when this is a reply. */
+  parentId?: string;
   /** Browser / page specs captured when the comment was posted. */
   envSpecs?: GiyaPinEnvSpec[];
 };

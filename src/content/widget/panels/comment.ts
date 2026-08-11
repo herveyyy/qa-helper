@@ -105,6 +105,7 @@ export function renderCommentPanel(
         label: picked.label,
         tagName: picked.tagName,
         text: html,
+        threadId: crypto.randomUUID(),
         envSpecs: collectEnvSpecs(),
       });
 

@@ -6,6 +6,7 @@ import {
   hrefMatchesPin,
   parseGiyaPinFromCommentHtml,
 } from "./giya_pin_markup.usecase";
+import { isPinReply, pinThreadId } from "./list_pin_thread.usecase";
 import { listAssigneeConcerns } from "./list_assignee_concerns.usecase";
 
 type CommentRow = {
@@ -83,22 +84,31 @@ export async function listPagePinComments(
     const rows = Array.isArray(json.message) ? json.message : [];
     const pins: GiyaPinComment[] = [];
 
+    // One badge per thread root (replies stay in the discussion panel only).
+    const seenThreads = new Set<string>();
+
     for (const row of rows) {
       const pin = parseGiyaPinFromCommentHtml(String(row.content || ""));
       if (!pin || !hrefMatchesPin(pageHref, pin.href)) continue;
+      if (isPinReply(pin)) continue;
+
+      const commentName = String(row.name || "");
+      const thread = pinThreadId(commentName, pin);
+      if (seenThreads.has(thread)) continue;
+      seenThreads.add(thread);
 
       const concernName = String(row.reference_name || "");
       const concernSubject = byName.get(concernName);
       if (!concernSubject) continue;
 
       pins.push({
-        commentName: String(row.name || ""),
+        commentName,
         concernName,
         concernSubject,
         commentBy: String(row.comment_by || row.comment_email || "Someone"),
         commentEmail: String(row.comment_email || ""),
         creation: String(row.creation || ""),
-        pin,
+        pin: { ...pin, threadId: thread },
       });
     }
 

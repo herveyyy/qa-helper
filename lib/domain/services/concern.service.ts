@@ -11,8 +11,13 @@ import {
   type CreateConcernInput,
 } from "../usecases/concern/create_assignee_concern.usecase";
 import { addConcernPinComment as addConcernPinCommentUseCase } from "../usecases/concern/add_concern_pin_comment.usecase";
+import {
+  getConcernDevopsStatus as getConcernDevopsStatusUseCase,
+  resolveConcernForStaging as resolveConcernForStagingUseCase,
+} from "../usecases/concern/get_concern_devops_status.usecase";
 import { listAssigneeConcerns as listAssigneeConcernsUseCase } from "../usecases/concern/list_assignee_concerns.usecase";
 import { listPagePinComments as listPagePinCommentsUseCase } from "../usecases/concern/list_page_pin_comments.usecase";
+import { listPinThreadComments as listPinThreadCommentsUseCase } from "../usecases/concern/list_pin_thread.usecase";
 import {
   uploadErpFile as uploadErpFileUseCase,
   type UploadErpFileInput,
@@ -96,6 +101,30 @@ export async function addConcernPinComment(
   baseUrl: string = ERP_BASE_URL
 ): Promise<ConcernResult<{ commentName: string }>> {
   const result = await addConcernPinCommentUseCase(concernName, pin, baseUrl);
+  if (result.ok) invalidateConcernCaches();
+  return result;
+}
+
+export async function listPinThreadComments(
+  concernName: string,
+  threadId: string,
+  baseUrl: string = ERP_BASE_URL
+): Promise<ConcernResult<GiyaPinComment[]>> {
+  return listPinThreadCommentsUseCase(concernName, threadId, baseUrl);
+}
+
+export async function getConcernDevopsStatus(
+  concernName: string,
+  baseUrl: string = ERP_BASE_URL
+) {
+  return getConcernDevopsStatusUseCase(concernName, baseUrl);
+}
+
+export async function resolveConcernForStaging(
+  concernName: string,
+  baseUrl: string = ERP_BASE_URL
+) {
+  const result = await resolveConcernForStagingUseCase(concernName, baseUrl);
   if (result.ok) invalidateConcernCaches();
   return result;
 }

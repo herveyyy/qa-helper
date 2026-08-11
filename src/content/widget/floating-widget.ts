@@ -1187,24 +1187,26 @@ export class FloatingWidget {
   }
 
   private showSavedPinPopout(item: GiyaPinComment): void {
-    const els = this.els;
-    if (!els) return;
+    void (async () => {
+      const els = this.els;
+      if (!els) return;
 
-    this.anchorCommentToPick = false;
-    this.picked = null;
-    this.clearDraftPin();
-    this.pinViewRect = null;
-    try {
-      const target = document.querySelector(item.pin.selector);
-      if (target) this.pinViewRect = target.getBoundingClientRect();
-    } catch {
+      this.anchorCommentToPick = false;
+      this.picked = null;
+      this.clearDraftPin();
       this.pinViewRect = null;
-    }
+      try {
+        const target = document.querySelector(item.pin.selector);
+        if (target) this.pinViewRect = target.getBoundingClientRect();
+      } catch {
+        this.pinViewRect = null;
+      }
 
-    this.activePanel = "pin";
-    this.syncDockActive();
-    showSavedPinPopout(els, item);
-    this.showPanelVisual();
+      this.activePanel = "pin";
+      this.syncDockActive();
+      this.showPanelVisual();
+      await showSavedPinPopout(els, item);
+    })();
   }
 
   private renderDraftPin(rect: DOMRect): void {

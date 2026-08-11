@@ -12,9 +12,12 @@ import {
 import {
   addConcernPinComment,
   createAssigneeConcern,
+  getConcernDevopsStatus,
   invalidateConcernCaches,
   listAssigneeConcerns,
   listPagePinComments,
+  listPinThreadComments,
+  resolveConcernForStaging,
   uploadErpFile,
 } from "../../lib/domain/services/concern.service";
 import { getUserProfile, openUserPage } from "../../lib/domain/services/user.service";
@@ -144,6 +147,44 @@ async function handleMessage(message: ExtensionRequest): Promise<ExtensionRespon
     return result.ok
       ? { type: "PIN_SAVED", ok: true, commentName: result.data.commentName }
       : { type: "PIN_SAVED", ok: false, error: result.error };
+  }
+
+  if (message.type === "LIST_PIN_THREAD") {
+    const result = await listPinThreadComments(
+      message.concernName,
+      message.threadId,
+      ERP_BASE_URL
+    );
+    return result.ok
+      ? { type: "PIN_THREAD", ok: true, comments: result.data }
+      : { type: "PIN_THREAD", ok: false, error: result.error };
+  }
+
+  if (message.type === "GET_CONCERN_DEVOPS") {
+    const result = await getConcernDevopsStatus(message.concernName, ERP_BASE_URL);
+    return result.ok
+      ? {
+          type: "CONCERN_DEVOPS",
+          ok: true,
+          devopsStatus: result.data.devopsStatus,
+          resolved: result.data.resolved,
+        }
+      : { type: "CONCERN_DEVOPS", ok: false, error: result.error };
+  }
+
+  if (message.type === "RESOLVE_CONCERN") {
+    const result = await resolveConcernForStaging(
+      message.concernName,
+      ERP_BASE_URL
+    );
+    return result.ok
+      ? {
+          type: "CONCERN_DEVOPS",
+          ok: true,
+          devopsStatus: result.data.devopsStatus,
+          resolved: result.data.resolved,
+        }
+      : { type: "CONCERN_DEVOPS", ok: false, error: result.error };
   }
 
   if (message.type === "UPLOAD_ERP_FILE") {
