@@ -11,9 +11,10 @@
  *   bun run pack -- --skip-build # zip existing dist only
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
 import { $ } from "bun";
+import { deflateRawSync } from "node:zlib";
 
 const ROOT = process.cwd();
 const PACKAGE_PATH = join(ROOT, "package.json");
@@ -117,13 +118,134 @@ async function resolveVersion(
   return next;
 }
 
+async function listDistFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  const walk = async (current: string) => {
+    for (const entry of await readdir(current, { withFileTypes: true })) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.isFile()) out.push(full);
+    }
+  };
+  await walk(dir);
+  return out.sort();
+}
+
+function crc32(buf: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i]!;
+    for (let j = 0; j < 8; j++) {
+      const mask = -(crc & 1);
+      crc = (crc >>> 1) ^ (0xedb88320 & mask);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function u16(n: number): Uint8Array {
+  const b = new Uint8Array(2);
+  new DataView(b.buffer).setUint16(0, n, true);
+  return b;
+}
+
+function u32(n: number): Uint8Array {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n, true);
+  return b;
+}
+
+function concat(chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/** Build a zip with forward-slash paths (no Windows ".\" prefixes). */
 async function zipDist(version: string): Promise<string> {
   await mkdir(OUT_DIR, { recursive: true });
   const zipName = `faye-v${version}.zip`;
   const zipPath = join(OUT_DIR, zipName);
+  try {
+    await unlink(zipPath);
+  } catch {
+    /* missing */
+  }
 
-  // Windows tar creates zip with -a; contents rooted at dist/ so Load unpacked works.
-  await $`tar -a -cf ${zipPath} -C ${DIST} .`.quiet();
+  const files = await listDistFiles(DIST);
+  if (!files.length) throw new Error("dist/ is empty — build first");
+
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const full of files) {
+    const name = relative(DIST, full).split(sep).join("/");
+    if (!name || name.startsWith("..")) continue;
+    const nameBytes = new TextEncoder().encode(name);
+    const data = new Uint8Array(await readFile(full));
+    const compressed = deflateRawSync(data, { level: 9 });
+    const checksum = crc32(data);
+
+    const localHeader = concat([
+      u32(0x04034b50),
+      u16(20),
+      u16(0),
+      u16(8),
+      u16(0),
+      u16(0),
+      u32(checksum),
+      u32(compressed.length),
+      u32(data.length),
+      u16(nameBytes.length),
+      u16(0),
+      nameBytes,
+    ]);
+
+    const centralHeader = concat([
+      u32(0x02014b50),
+      u16(20),
+      u16(20),
+      u16(0),
+      u16(8),
+      u16(0),
+      u16(0),
+      u32(checksum),
+      u32(compressed.length),
+      u32(data.length),
+      u16(nameBytes.length),
+      u16(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u32(0),
+      u32(offset),
+      nameBytes,
+    ]);
+
+    localParts.push(localHeader, compressed);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + compressed.length;
+  }
+
+  const central = concat(centralParts);
+  const end = concat([
+    u32(0x06054b50),
+    u16(0),
+    u16(0),
+    u16(centralParts.length),
+    u16(centralParts.length),
+    u32(central.length),
+    u32(offset),
+    u16(0),
+  ]);
+
+  await writeFile(zipPath, concat([...localParts, central, end]));
   return zipPath;
 }
 
