@@ -252,6 +252,15 @@
   outline: none;
 }
 
+.giya-rte-compact .giya-rte-editor {
+  min-height: 4.5rem;
+  max-height: 10rem;
+}
+
+.giya-str .giya-rte-toolbar {
+  border-radius: 0.65rem;
+}
+
 .giya-rte-editor:focus {
   box-shadow: 0 0 0 2px rgb(23 23 23 / 0.35);
 }
@@ -309,6 +318,20 @@
   margin: 0.25rem 0;
 }
 
+.giya-comment-html ol,
+.giya-rte-editor ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.35rem 0;
+}
+
+.giya-comment-html ul,
+.giya-rte-editor ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.35rem 0;
+}
+
 [data-giya-theme="dark"] .giya-rte-toolbar {
   background: rgb(40 40 40);
   color: rgb(250 250 250);
@@ -330,4 +353,306 @@
 
 [data-giya-theme="dark"] .giya-comment-html {
   color: rgb(250 250 250) !important;
+}
+
+/* Steps to replicate builder */
+.giya-str {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(0 0 0 / 0.1);
+  background: rgb(255 255 255 / 0.85);
+}
+
+.giya-str-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.giya-str-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(82 82 82);
+}
+
+.giya-str-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.giya-str-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.giya-str-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgb(0 0 0 / 0.08);
+  background: rgb(255 255 255 / 0.55);
+}
+
+.giya-str-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.giya-str-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  color: rgb(115 115 115);
+}
+
+.giya-str-num {
+  width: 1.25rem;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(115 115 115);
+}
+
+.giya-str-input,
+.giya-str-area {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(0 0 0 / 0.12);
+  background: rgb(255 255 255);
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8rem;
+  color: rgb(23 23 23);
+  outline: none;
+}
+
+.giya-str-input:focus,
+.giya-str-area:focus {
+  box-shadow: 0 0 0 2px rgb(23 23 23 / 0.25);
+}
+
+.giya-str-area {
+  resize: vertical;
+  min-height: 2.5rem;
+}
+
+.giya-str-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgb(82 82 82);
+}
+
+.giya-str-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+}
+
+.giya-str-row-actions button,
+.giya-str-ghost,
+.giya-str-add,
+.giya-str-primary {
+  border: 0;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.giya-str-row-actions button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.35rem;
+  background: rgb(0 0 0 / 0.06);
+  color: rgb(64 64 64);
+}
+
+.giya-str-row-actions button:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.12);
+}
+
+.giya-str-row-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.giya-str-ghost {
+  background: transparent;
+  color: rgb(82 82 82);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+
+.giya-str-add {
+  align-self: flex-start;
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(38 38 38);
+  font-weight: 500;
+  padding: 0.2rem 0.1rem;
+}
+
+.giya-str-add:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.giya-str-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.giya-str-primary {
+  border-radius: 999px;
+  background: rgb(23 23 23);
+  color: rgb(250 250 250);
+  font-weight: 500;
+  padding: 0.4rem 0.9rem;
+}
+
+.giya-str-primary:hover {
+  background: rgb(38 38 38);
+}
+
+.giya-str-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgb(185 28 28);
+}
+
+[data-giya-theme="dark"] .giya-str {
+  border-color: rgb(255 255 255 / 0.18);
+  background: rgb(32 32 32 / 0.95);
+}
+
+[data-giya-theme="dark"] .giya-str-card {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(24 24 24 / 0.7);
+}
+
+[data-giya-theme="dark"] .giya-str-title,
+[data-giya-theme="dark"] .giya-str-label,
+[data-giya-theme="dark"] .giya-str-num,
+[data-giya-theme="dark"] .giya-str-ghost,
+[data-giya-theme="dark"] .giya-str-add,
+[data-giya-theme="dark"] .giya-str-hint {
+  color: rgb(180 180 180);
+}
+
+[data-giya-theme="dark"] .giya-str-input,
+[data-giya-theme="dark"] .giya-str-area {
+  border-color: rgb(255 255 255 / 0.18);
+  background: rgb(24 24 24);
+  color: rgb(250 250 250);
+}
+
+[data-giya-theme="dark"] .giya-str-row-actions button {
+  background: rgb(255 255 255 / 0.08);
+  color: rgb(220 220 220);
+}
+
+[data-giya-theme="dark"] .giya-str-primary {
+  background: rgb(250 250 250);
+  color: rgb(18 18 18);
+}
+
+/* Screenshot annotate overlay */
+.giya-shot {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  background: rgb(0 0 0 / 0.72);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.giya-shot-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 0.85rem;
+  background: rgb(18 18 18);
+  color: rgb(250 250 250);
+}
+
+.giya-shot-btn,
+.giya-shot-primary {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.35rem 0.7rem;
+}
+
+.giya-shot-btn {
+  background: transparent;
+  color: rgb(180 180 180);
+}
+
+.giya-shot-btn:hover {
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(250 250 250);
+}
+
+.giya-shot-btn.is-active {
+  background: rgb(250 250 250);
+  color: rgb(18 18 18);
+}
+
+.giya-shot-primary {
+  background: rgb(250 250 250);
+  color: rgb(18 18 18);
+}
+
+.giya-shot-primary:hover {
+  background: rgb(229 229 229);
+}
+
+.giya-shot-sep {
+  width: 1px;
+  height: 1rem;
+  background: rgb(255 255 255 / 0.25);
+  margin: 0 0.15rem;
+}
+
+.giya-shot-grow {
+  flex: 1;
+}
+
+.giya-shot-stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.giya-shot-canvas {
+  max-width: 100%;
+  max-height: calc(100vh - 4.5rem);
+  cursor: crosshair;
+  background: rgb(0 0 0 / 0.35);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.45);
+  touch-action: none;
 }

@@ -44,6 +44,7 @@ export type ExtensionRequest =
       isPrivate?: boolean;
     }
   | { type: "FETCH_ERP_FILE_DATA"; url: string }
+  | { type: "CAPTURE_VISIBLE_TAB" }
   | { type: "OPEN_LOGIN_PAGE" }
   | { type: "OPEN_USER_PAGE" }
   | { type: "OPEN_LIVRO_LOGIN" };
@@ -92,5 +93,7 @@ export type ExtensionResponse =
   | { type: "ERP_FILE"; ok: false; error: string }
   | { type: "ERP_FILE_DATA"; ok: true; dataUrl: string; mimeType: string }
   | { type: "ERP_FILE_DATA"; ok: false; error: string }
+  | { type: "TAB_CAPTURE"; ok: true; dataUrl: string }
+  | { type: "TAB_CAPTURE"; ok: false; error: string }
   | { type: "OPENED_LOGIN" }
   | { type: "OPENED_USER" };

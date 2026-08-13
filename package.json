@@ -6,7 +6,8 @@
   "scripts": {
     "build": "bun run typecheck && bun scripts/build.ts",
     "typecheck": "tsc --noEmit",
-    "watch": "bun scripts/build.ts --watch"
+    "watch": "bun scripts/build.ts --watch",
+    "pack": "bun scripts/pack.ts"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.11",

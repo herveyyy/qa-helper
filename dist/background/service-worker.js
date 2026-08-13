@@ -1739,7 +1739,7 @@
       }
     })();
   });
-  async function handleMessage(message) {
+  async function handleMessage(message, sender) {
     if (message.type === "PEEK_SID") {
       const hasSid = await peekSid(ERP_BASE_URL);
       return { type: "PEEK_SID", hasSid };
@@ -1859,6 +1859,24 @@
         mimeType: result.data.mimeType
       } : { type: "ERP_FILE_DATA", ok: false, error: result.error };
     }
+    if (message.type === "CAPTURE_VISIBLE_TAB") {
+      const windowId = sender.tab?.windowId;
+      if (windowId == null) {
+        return { type: "TAB_CAPTURE", ok: false, error: "No active tab to capture." };
+      }
+      try {
+        const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+          format: "png"
+        });
+        if (!dataUrl) {
+          return { type: "TAB_CAPTURE", ok: false, error: "Capture returned empty." };
+        }
+        return { type: "TAB_CAPTURE", ok: true, dataUrl };
+      } catch (error) {
+        const text = error instanceof Error ? error.message : "Screenshot capture failed.";
+        return { type: "TAB_CAPTURE", ok: false, error: text };
+      }
+    }
     if (message.type === "OPEN_LOGIN_PAGE") {
       openExtensionLoginPage();
       return { type: "OPENED_LOGIN" };
@@ -1878,8 +1896,8 @@
     }
     return { type: "SESSION", ok: false, error: "Unknown message." };
   }
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    handleMessage(message).then((response) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    handleMessage(message, sender).then((response) => {
       try {
         sendResponse(response);
       } catch {}
@@ -1920,5 +1938,5 @@
   });
 })();
 
-//# debugId=8000FB1D0A97AC9764756E2164756E21
+//# debugId=28F8CDFF792C375964756E2164756E21
 //# sourceMappingURL=service-worker.js.map

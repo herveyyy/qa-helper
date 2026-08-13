@@ -90,6 +90,8 @@
     sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
     moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
     image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
+    steps: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>`,
+    capture: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
     search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
     spinner: `<svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 animate-spin" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`
   };
@@ -573,6 +575,15 @@
     }
     return { ok: false, error: "Reload this page — Faye was updated." };
   }
+  async function captureVisibleTab() {
+    const response = await sendRuntimeMessage({ type: "CAPTURE_VISIBLE_TAB" });
+    if (response?.type === "TAB_CAPTURE") {
+      if (response.ok)
+        return { ok: true, dataUrl: response.dataUrl };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Faye was updated." };
+  }
   async function fetchErpFileDataUrl(url) {
     const response = await sendRuntimeMessage({
       type: "FETCH_ERP_FILE_DATA",
@@ -761,6 +772,424 @@
     }));
   }
 
+  // src/content/widget/screenshot-annotate.ts
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  async function capturePageScreenshot() {
+    const host = document.getElementById(HOST_ID);
+    const prev = host?.style.visibility ?? "";
+    if (host)
+      host.style.visibility = "hidden";
+    try {
+      await sleep(60);
+      return await captureVisibleTab();
+    } finally {
+      if (host)
+        host.style.visibility = prev;
+    }
+  }
+  function drawArrow(ctx, a, b, color, width) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const head = Math.max(10, width * 4);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - ux * head - uy * head * 0.45, b.y - uy * head + ux * head * 0.45);
+    ctx.lineTo(b.x - ux * head + uy * head * 0.45, b.y - uy * head - ux * head * 0.45);
+    ctx.closePath();
+    ctx.fill();
+  }
+  function paintStroke(ctx, stroke) {
+    if (stroke.kind === "pen") {
+      if (stroke.points.length < 2)
+        return;
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1;i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.stroke();
+      return;
+    }
+    if (stroke.kind === "highlight") {
+      const x = Math.min(stroke.a.x, stroke.b.x);
+      const y = Math.min(stroke.a.y, stroke.b.y);
+      const w = Math.abs(stroke.b.x - stroke.a.x);
+      const h = Math.abs(stroke.b.y - stroke.a.y);
+      ctx.fillStyle = "rgba(250, 204, 21, 0.35)";
+      ctx.fillRect(x, y, w, h);
+      return;
+    }
+    if (stroke.kind === "rect") {
+      const x = Math.min(stroke.a.x, stroke.b.x);
+      const y = Math.min(stroke.a.y, stroke.b.y);
+      const w = Math.abs(stroke.b.x - stroke.a.x);
+      const h = Math.abs(stroke.b.y - stroke.a.y);
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.strokeRect(x, y, w, h);
+      return;
+    }
+    drawArrow(ctx, stroke.a, stroke.b, stroke.color, stroke.width);
+  }
+  function openScreenshotAnnotator(shadowRoot, dataUrl) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "giya-shot";
+      overlay.setAttribute("data-giya-shot", "");
+      overlay.innerHTML = `
+      <div class="giya-shot-bar" role="toolbar" aria-label="Screenshot tools">
+        <button type="button" data-tool="pen" class="giya-shot-btn is-active">Pen</button>
+        <button type="button" data-tool="rect" class="giya-shot-btn">Box</button>
+        <button type="button" data-tool="arrow" class="giya-shot-btn">Arrow</button>
+        <button type="button" data-tool="highlight" class="giya-shot-btn">Highlight</button>
+        <span class="giya-shot-sep" aria-hidden="true"></span>
+        <button type="button" data-shot-undo class="giya-shot-btn">Undo</button>
+        <button type="button" data-shot-clear class="giya-shot-btn">Clear</button>
+        <span class="giya-shot-grow"></span>
+        <button type="button" data-shot-cancel class="giya-shot-btn">Cancel</button>
+        <button type="button" data-shot-insert class="giya-shot-primary">Insert</button>
+      </div>
+      <div class="giya-shot-stage">
+        <canvas data-shot-canvas class="giya-shot-canvas"></canvas>
+      </div>
+    `;
+      shadowRoot.appendChild(overlay);
+      const canvas = overlay.querySelector("[data-shot-canvas]");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        overlay.remove();
+        resolve({ ok: false, error: "Canvas unavailable." });
+        return;
+      }
+      let tool = "pen";
+      const color = "#ef4444";
+      const width = 3;
+      const strokes = [];
+      let draft = null;
+      let drawing = false;
+      let settled = false;
+      const finish = (result) => {
+        if (settled)
+          return;
+        settled = true;
+        overlay.remove();
+        resolve(result);
+      };
+      const img = new Image;
+      img.onload = () => {
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        redraw();
+      };
+      img.onerror = () => finish({ ok: false, error: "Failed to load screenshot." });
+      img.src = dataUrl;
+      const redraw = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        for (const stroke of strokes)
+          paintStroke(ctx, stroke);
+        if (draft)
+          paintStroke(ctx, draft);
+      };
+      const toCanvasPoint = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = canvas.width / Math.max(1, rect.width);
+        const sy = canvas.height / Math.max(1, rect.height);
+        return {
+          x: (event.clientX - rect.left) * sx,
+          y: (event.clientY - rect.top) * sy
+        };
+      };
+      const setActiveTool = (next) => {
+        tool = next;
+        for (const btn of overlay.querySelectorAll("[data-tool]")) {
+          btn.classList.toggle("is-active", btn.dataset.tool === next);
+        }
+      };
+      overlay.querySelector(".giya-shot-bar")?.addEventListener("click", (event) => {
+        const btn = event.target?.closest("button");
+        if (!btn)
+          return;
+        const nextTool = btn.getAttribute("data-tool");
+        if (nextTool) {
+          setActiveTool(nextTool);
+          return;
+        }
+        if (btn.hasAttribute("data-shot-undo")) {
+          strokes.pop();
+          draft = null;
+          redraw();
+          return;
+        }
+        if (btn.hasAttribute("data-shot-clear")) {
+          strokes.length = 0;
+          draft = null;
+          redraw();
+          return;
+        }
+        if (btn.hasAttribute("data-shot-cancel")) {
+          finish({ ok: false, cancelled: true });
+          return;
+        }
+        if (btn.hasAttribute("data-shot-insert")) {
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              finish({ ok: false, error: "Could not export screenshot." });
+              return;
+            }
+            const file = new File([blob], `faye-screenshot-${Date.now()}.png`, {
+              type: "image/png"
+            });
+            finish({ ok: true, file });
+          }, "image/png");
+        }
+      });
+      canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0)
+          return;
+        event.preventDefault();
+        canvas.setPointerCapture(event.pointerId);
+        drawing = true;
+        const p = toCanvasPoint(event);
+        if (tool === "pen") {
+          draft = { kind: "pen", points: [p], color, width };
+        } else if (tool === "highlight") {
+          draft = { kind: "highlight", a: p, b: p };
+        } else if (tool === "rect") {
+          draft = { kind: "rect", a: p, b: p, color, width };
+        } else {
+          draft = { kind: "arrow", a: p, b: p, color, width };
+        }
+        redraw();
+      });
+      canvas.addEventListener("pointermove", (event) => {
+        if (!drawing || !draft)
+          return;
+        const p = toCanvasPoint(event);
+        if (draft.kind === "pen") {
+          draft.points.push(p);
+        } else {
+          draft.b = p;
+        }
+        redraw();
+      });
+      const endStroke = (event) => {
+        if (!drawing)
+          return;
+        drawing = false;
+        try {
+          canvas.releasePointerCapture(event.pointerId);
+        } catch {}
+        if (draft) {
+          if (draft.kind === "pen" && draft.points.length < 2) {
+            draft = null;
+          } else {
+            strokes.push(draft);
+            draft = null;
+          }
+        }
+        redraw();
+      };
+      canvas.addEventListener("pointerup", endStroke);
+      canvas.addEventListener("pointercancel", endStroke);
+      overlay.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finish({ ok: false, cancelled: true });
+        }
+      });
+    });
+  }
+
+  // src/content/widget/steps-builder.ts
+  function paragraphsFromPlain(text) {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (!lines.length)
+      return "";
+    return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+  }
+  function stepBodyHtml(html) {
+    return sanitizeCommentHtml(html);
+  }
+  function stepToHtml(html, index) {
+    const body = stepBodyHtml(html);
+    if (isBlankCommentHtml(body))
+      return "";
+    const n = index + 1;
+    if (/^<p(\s|>)/i.test(body)) {
+      return body.replace(/^<p([^>]*)>/i, `<p$1><strong>${n}.</strong> `);
+    }
+    return `<p><strong>${n}.</strong></p>${body}`;
+  }
+  function buildStepsToReplicateHtml(input) {
+    const numbered = input.steps.map((html, index) => stepToHtml(html, index)).filter(Boolean);
+    if (!numbered.length)
+      return null;
+    const parts = [
+      "<p><strong>Steps to replicate</strong></p>",
+      ...numbered
+    ];
+    const expected = paragraphsFromPlain(input.expected);
+    if (expected) {
+      parts.push("<p><strong>Expected</strong></p>", expected);
+    }
+    const actual = paragraphsFromPlain(input.actual);
+    if (actual) {
+      parts.push("<p><strong>Actual</strong></p>", actual);
+    }
+    return parts.join("");
+  }
+  function openStepsBuilder(host, opts) {
+    host.querySelector("[data-str-builder]")?.remove();
+    const panel = document.createElement("div");
+    panel.className = "giya-str";
+    panel.setAttribute("data-str-builder", "");
+    panel.innerHTML = `
+    <div class="giya-str-head">
+      <p class="giya-str-title">Steps to replicate</p>
+      <button type="button" data-str-cancel class="giya-str-ghost" aria-label="Cancel">Cancel</button>
+    </div>
+    <p class="giya-str-hint">Type, paste a screenshot (Ctrl+V), or use the camera / image tools in each step.</p>
+    <div data-str-steps class="giya-str-steps"></div>
+    <button type="button" data-str-add class="giya-str-add">+ Add step</button>
+    <label class="giya-str-label">Expected
+      <textarea data-str-expected class="giya-str-area" rows="2" placeholder="What should happen…"></textarea>
+    </label>
+    <label class="giya-str-label">Actual
+      <textarea data-str-actual class="giya-str-area" rows="2" placeholder="What happened…"></textarea>
+    </label>
+    <p data-str-error class="giya-str-error" hidden></p>
+    <div class="giya-str-actions">
+      <button type="button" data-str-insert class="giya-str-primary">Insert</button>
+    </div>
+  `;
+    host.appendChild(panel);
+    const stepsEl = panel.querySelector("[data-str-steps]");
+    const errorEl = panel.querySelector("[data-str-error]");
+    const insertBtn = panel.querySelector("[data-str-insert]");
+    let drafts = [""];
+    let editors = [];
+    const showError = (message) => {
+      if (!message) {
+        errorEl.hidden = true;
+        errorEl.textContent = "";
+        return;
+      }
+      errorEl.hidden = false;
+      errorEl.textContent = message;
+    };
+    const syncDraftsFromEditors = () => {
+      drafts = editors.map((ed, i) => ed.getHtml() || drafts[i] || "");
+    };
+    const mountAll = (focusIndex) => {
+      editors = [];
+      stepsEl.innerHTML = drafts.map((_html, index) => `
+      <div class="giya-str-card" data-str-row="${index}">
+        <div class="giya-str-card-top">
+          <span class="giya-str-num">${index + 1}.</span>
+          <div class="giya-str-row-actions">
+            <button type="button" data-str-up title="Move up" aria-label="Move up" ${index === 0 ? "disabled" : ""}>↑</button>
+            <button type="button" data-str-down title="Move down" aria-label="Move down" ${index === drafts.length - 1 ? "disabled" : ""}>↓</button>
+            <button type="button" data-str-remove title="Remove" aria-label="Remove step" ${drafts.length <= 1 ? "disabled" : ""}>×</button>
+          </div>
+        </div>
+        <div data-str-editor-host></div>
+      </div>`).join("");
+      const hosts = stepsEl.querySelectorAll("[data-str-editor-host]");
+      hosts.forEach((editorHost, index) => {
+        const api = opts.mountEditor(editorHost, {
+          placeholder: "Describe this step… paste screenshot here",
+          concernName: opts.concernName,
+          onStatus: opts.onStatus,
+          initialHtml: drafts[index] || "",
+          compact: true
+        });
+        editors.push(api);
+      });
+      if (focusIndex != null) {
+        queueMicrotask(() => editors[focusIndex]?.focus());
+      }
+    };
+    stepsEl.addEventListener("click", (event) => {
+      const btn = event.target?.closest("button");
+      if (!btn)
+        return;
+      const row = btn.closest("[data-str-row]");
+      if (!row)
+        return;
+      const index = Number(row.dataset.strRow || "-1");
+      if (Number.isNaN(index) || index < 0)
+        return;
+      syncDraftsFromEditors();
+      if (btn.hasAttribute("data-str-up") && index > 0) {
+        const tmp = drafts[index - 1];
+        drafts[index - 1] = drafts[index];
+        drafts[index] = tmp;
+        mountAll(index - 1);
+        return;
+      }
+      if (btn.hasAttribute("data-str-down") && index < drafts.length - 1) {
+        const tmp = drafts[index + 1];
+        drafts[index + 1] = drafts[index];
+        drafts[index] = tmp;
+        mountAll(index + 1);
+        return;
+      }
+      if (btn.hasAttribute("data-str-remove") && drafts.length > 1) {
+        drafts.splice(index, 1);
+        mountAll(Math.min(index, drafts.length - 1));
+      }
+    });
+    panel.querySelector("[data-str-add]")?.addEventListener("click", () => {
+      syncDraftsFromEditors();
+      drafts.push("");
+      mountAll(drafts.length - 1);
+    });
+    const close = () => {
+      editors = [];
+      panel.remove();
+    };
+    panel.querySelector("[data-str-cancel]")?.addEventListener("click", () => {
+      close();
+      opts.onCancel?.();
+    });
+    insertBtn.addEventListener("click", () => {
+      syncDraftsFromEditors();
+      const expected = panel.querySelector("[data-str-expected]").value || "";
+      const actual = panel.querySelector("[data-str-actual]").value || "";
+      const html = buildStepsToReplicateHtml({
+        steps: drafts,
+        expected,
+        actual
+      });
+      if (!html) {
+        showError("Add text or a screenshot to at least one step.");
+        return;
+      }
+      close();
+      opts.onInsert(html);
+    });
+    mountAll(0);
+    return { close };
+  }
+
   // src/content/widget/rich-editor.ts
   function toolbarButton(cmd, label, title) {
     return `<button type="button" data-cmd="${cmd}" class="giya-rte-btn" title="${title}" aria-label="${title}">${label}</button>`;
@@ -788,8 +1217,10 @@
     return sanitizeCommentHtml(clone.innerHTML);
   }
   function mountRichCommentEditor(host, opts = {}) {
+    const enableSteps = opts.enableSteps !== false;
+    const stepsBtn = enableSteps ? `<button type="button" data-cmd="steps" class="giya-rte-btn" title="Steps to replicate" aria-label="Steps to replicate">${ICONS.steps}</button>` : "";
     host.innerHTML = `
-    <div class="giya-rte" data-giya-rte>
+    <div class="giya-rte${opts.compact ? " giya-rte-compact" : ""}" data-giya-rte>
       <div class="giya-rte-toolbar" role="toolbar" aria-label="Comment formatting">
         ${toolbarButton("bold", "<b>B</b>", "Bold")}
         ${toolbarButton("italic", "<i>I</i>", "Italic")}
@@ -799,9 +1230,11 @@
         ${toolbarButton("insertUnorderedList", "•", "Bullet list")}
         ${toolbarButton("insertOrderedList", "1.", "Numbered list")}
         ${toolbarButton("formatBlock:blockquote", "“", "Quote")}
+        ${stepsBtn}
         <span class="giya-rte-sep" aria-hidden="true"></span>
         ${toolbarButton("createLink", "\uD83D\uDD17", "Link")}
         <button type="button" data-cmd="image" class="giya-rte-btn" title="Upload image" aria-label="Upload image">${ICONS.image}</button>
+        <button type="button" data-cmd="capture" class="giya-rte-btn" title="Screenshot &amp; annotate" aria-label="Screenshot and annotate">${ICONS.capture}</button>
       </div>
       <div
         data-rte-editor
@@ -814,10 +1247,16 @@
       <input data-rte-file type="file" accept="image/*" class="hidden" hidden />
     </div>
   `;
+    const rte = host.querySelector("[data-giya-rte]");
     const editor = host.querySelector("[data-rte-editor]");
+    if (opts.initialHtml) {
+      editor.innerHTML = sanitizeCommentHtml(opts.initialHtml);
+      hydrateErpImages(editor);
+    }
     const fileInput = host.querySelector("[data-rte-file]");
     const toolbar = host.querySelector(".giya-rte-toolbar");
     let selectedImg = null;
+    let stepsBuilderOpen = false;
     const run = (command, value) => {
       editor.focus();
       try {
@@ -832,8 +1271,9 @@
           const block = String(document.queryCommandValue("formatBlock") || "").replace(/[<>]/g, "").toLowerCase();
           return Boolean(tag && block === tag);
         }
-        if (cmd === "createLink" || cmd === "image")
+        if (cmd === "createLink" || cmd === "image" || cmd === "steps" || cmd === "capture") {
           return false;
+        }
         return document.queryCommandState(cmd);
       } catch {
         return false;
@@ -909,6 +1349,52 @@
       }
       opts.onStatus?.("Image attached — click it, drag the corner to resize.");
     };
+    const openSteps = () => {
+      if (stepsBuilderOpen)
+        return;
+      stepsBuilderOpen = true;
+      openStepsBuilder(rte, {
+        concernName: opts.concernName,
+        onStatus: opts.onStatus,
+        mountEditor: (editorHost, editorOpts) => mountRichCommentEditor(editorHost, {
+          ...editorOpts,
+          enableSteps: false
+        }),
+        onInsert: (html) => {
+          stepsBuilderOpen = false;
+          run("insertHTML", `${html}<p><br></p>`);
+          opts.onStatus?.("Steps inserted.");
+          hydrateErpImages(editor);
+        },
+        onCancel: () => {
+          stepsBuilderOpen = false;
+        }
+      });
+    };
+    const openCapture = async () => {
+      opts.onStatus?.("Capturing page…");
+      const shot = await capturePageScreenshot();
+      if (!shot.ok) {
+        opts.onStatus?.(shot.error);
+        return;
+      }
+      const root = host.getRootNode();
+      if (!(root instanceof ShadowRoot)) {
+        opts.onStatus?.("Could not open annotator.");
+        return;
+      }
+      opts.onStatus?.("Draw on the screenshot, then Insert.");
+      const annotated = await openScreenshotAnnotator(root, shot.dataUrl);
+      if (!annotated.ok) {
+        if ("cancelled" in annotated && annotated.cancelled) {
+          opts.onStatus?.("Screenshot cancelled.");
+          return;
+        }
+        opts.onStatus?.("error" in annotated ? annotated.error : "Screenshot failed.");
+        return;
+      }
+      await insertImageFromFile(annotated.file, "Uploading screenshot to Livro…");
+    };
     toolbar.addEventListener("mousedown", (event) => {
       event.preventDefault();
     });
@@ -925,6 +1411,14 @@
       }
       if (cmd === "image") {
         fileInput.click();
+        return;
+      }
+      if (cmd === "steps") {
+        openSteps();
+        return;
+      }
+      if (cmd === "capture") {
+        openCapture();
         return;
       }
       if (cmd.startsWith("formatBlock:")) {
@@ -982,6 +1476,8 @@
       clear: () => {
         clearImageSelection();
         editor.innerHTML = "";
+        host.querySelector("[data-str-builder]")?.remove();
+        stepsBuilderOpen = false;
         syncToolbarState();
       },
       focus: () => editor.focus()
@@ -3103,5 +3599,5 @@
   }
 })();
 
-//# debugId=5A17DCDB77E5201D64756E2164756E21
+//# debugId=D798032DF47C9E5B64756E2164756E21
 //# sourceMappingURL=widget.js.map

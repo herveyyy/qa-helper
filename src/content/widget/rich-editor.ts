@@ -5,6 +5,11 @@ import {
   sanitizeCommentHtml,
 } from "../../../lib/domain/usecases/concern/sanitize_comment_html.usecase";
 import { hydrateErpImages } from "./image-preview.ts";
+import {
+  capturePageScreenshot,
+  openScreenshotAnnotator,
+} from "./screenshot-annotate.ts";
+import { openStepsBuilder } from "./steps-builder.ts";
 
 export type RichEditorApi = {
   getHtml: () => string;
@@ -18,6 +23,12 @@ type MountOpts = {
   /** Attach uploads to this SPB when possible. */
   concernName?: string;
   onStatus?: (message: string) => void;
+  /** Seed content (used by Steps builder). */
+  initialHtml?: string;
+  /** Smaller editor for nested step cards. */
+  compact?: boolean;
+  /** Show Steps-to-replicate toolbar button (off inside the Steps builder). */
+  enableSteps?: boolean;
 };
 
 function toolbarButton(cmd: string, label: string, title: string): string {
@@ -51,8 +62,13 @@ export function mountRichCommentEditor(
   host: HTMLElement,
   opts: MountOpts = {}
 ): RichEditorApi {
+  const enableSteps = opts.enableSteps !== false;
+  const stepsBtn = enableSteps
+    ? `<button type="button" data-cmd="steps" class="giya-rte-btn" title="Steps to replicate" aria-label="Steps to replicate">${ICONS.steps}</button>`
+    : "";
+
   host.innerHTML = `
-    <div class="giya-rte" data-giya-rte>
+    <div class="giya-rte${opts.compact ? " giya-rte-compact" : ""}" data-giya-rte>
       <div class="giya-rte-toolbar" role="toolbar" aria-label="Comment formatting">
         ${toolbarButton("bold", "<b>B</b>", "Bold")}
         ${toolbarButton("italic", "<i>I</i>", "Italic")}
@@ -62,9 +78,11 @@ export function mountRichCommentEditor(
         ${toolbarButton("insertUnorderedList", "•", "Bullet list")}
         ${toolbarButton("insertOrderedList", "1.", "Numbered list")}
         ${toolbarButton("formatBlock:blockquote", "“", "Quote")}
+        ${stepsBtn}
         <span class="giya-rte-sep" aria-hidden="true"></span>
         ${toolbarButton("createLink", "🔗", "Link")}
         <button type="button" data-cmd="image" class="giya-rte-btn" title="Upload image" aria-label="Upload image">${ICONS.image}</button>
+        <button type="button" data-cmd="capture" class="giya-rte-btn" title="Screenshot &amp; annotate" aria-label="Screenshot and annotate">${ICONS.capture}</button>
       </div>
       <div
         data-rte-editor
@@ -78,10 +96,16 @@ export function mountRichCommentEditor(
     </div>
   `;
 
+  const rte = host.querySelector("[data-giya-rte]") as HTMLElement;
   const editor = host.querySelector("[data-rte-editor]") as HTMLDivElement;
+  if (opts.initialHtml) {
+    editor.innerHTML = sanitizeCommentHtml(opts.initialHtml);
+    void hydrateErpImages(editor);
+  }
   const fileInput = host.querySelector("[data-rte-file]") as HTMLInputElement;
   const toolbar = host.querySelector(".giya-rte-toolbar") as HTMLElement;
   let selectedImg: HTMLImageElement | null = null;
+  let stepsBuilderOpen = false;
 
   const run = (command: string, value?: string) => {
     editor.focus();
@@ -102,7 +126,14 @@ export function mountRichCommentEditor(
           .toLowerCase();
         return Boolean(tag && block === tag);
       }
-      if (cmd === "createLink" || cmd === "image") return false;
+      if (
+        cmd === "createLink" ||
+        cmd === "image" ||
+        cmd === "steps" ||
+        cmd === "capture"
+      ) {
+        return false;
+      }
       return document.queryCommandState(cmd);
     } catch {
       return false;
@@ -191,6 +222,57 @@ export function mountRichCommentEditor(
     opts.onStatus?.("Image attached — click it, drag the corner to resize.");
   };
 
+  const openSteps = () => {
+    if (stepsBuilderOpen) return;
+    stepsBuilderOpen = true;
+    openStepsBuilder(rte, {
+      concernName: opts.concernName,
+      onStatus: opts.onStatus,
+      mountEditor: (editorHost, editorOpts) =>
+        mountRichCommentEditor(editorHost, {
+          ...editorOpts,
+          enableSteps: false,
+        }),
+      onInsert: (html) => {
+        stepsBuilderOpen = false;
+        run("insertHTML", `${html}<p><br></p>`);
+        opts.onStatus?.("Steps inserted.");
+        void hydrateErpImages(editor);
+      },
+      onCancel: () => {
+        stepsBuilderOpen = false;
+      },
+    });
+  };
+
+  const openCapture = async () => {
+    opts.onStatus?.("Capturing page…");
+    const shot = await capturePageScreenshot();
+    if (!shot.ok) {
+      opts.onStatus?.(shot.error);
+      return;
+    }
+
+    const root = host.getRootNode();
+    if (!(root instanceof ShadowRoot)) {
+      opts.onStatus?.("Could not open annotator.");
+      return;
+    }
+
+    opts.onStatus?.("Draw on the screenshot, then Insert.");
+    const annotated = await openScreenshotAnnotator(root, shot.dataUrl);
+    if (!annotated.ok) {
+      if ("cancelled" in annotated && annotated.cancelled) {
+        opts.onStatus?.("Screenshot cancelled.");
+        return;
+      }
+      opts.onStatus?.("error" in annotated ? annotated.error : "Screenshot failed.");
+      return;
+    }
+
+    await insertImageFromFile(annotated.file, "Uploading screenshot to Livro…");
+  };
+
   toolbar.addEventListener("mousedown", (event) => {
     event.preventDefault();
   });
@@ -210,6 +292,16 @@ export function mountRichCommentEditor(
 
     if (cmd === "image") {
       fileInput.click();
+      return;
+    }
+
+    if (cmd === "steps") {
+      openSteps();
+      return;
+    }
+
+    if (cmd === "capture") {
+      void openCapture();
       return;
     }
 
@@ -271,6 +363,8 @@ export function mountRichCommentEditor(
     clear: () => {
       clearImageSelection();
       editor.innerHTML = "";
+      host.querySelector("[data-str-builder]")?.remove();
+      stepsBuilderOpen = false;
       syncToolbarState();
     },
     focus: () => editor.focus(),

@@ -1,7 +1,7 @@
 {
   "name": "Faye",
   "description": "Floating Faye assistant with a right sidebar on any page.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "manifest_version": 3,
   "icons": {
     "16": "assets/faye-icon-16.png",
@@ -23,8 +23,15 @@
     "page": "options/options.html",
     "open_in_tab": true
   },
-  "permissions": ["storage", "cookies", "tabs"],
-  "host_permissions": ["<all_urls>", "https://erp.livro.systems/*"],
+  "permissions": [
+    "storage",
+    "cookies",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "https://erp.livro.systems/*"
+  ],
   "web_accessible_resources": [
     {
       "resources": [
@@ -34,13 +41,19 @@
         "assets/faye-icon-128.png",
         "content/widget.css"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content/widget.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/widget.js"
+      ],
       "run_at": "document_idle"
     }
   ]
