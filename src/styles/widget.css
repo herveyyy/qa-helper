@@ -318,6 +318,29 @@
   margin: 0.25rem 0;
 }
 
+.giya-env-specs {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: rgb(82 82 82);
+}
+
+.giya-env-specs summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: rgb(64 64 64);
+}
+
+.giya-env-specs ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+[data-giya-theme="dark"] .giya-env-specs,
+[data-giya-theme="dark"] .giya-env-specs summary {
+  color: rgb(180 180 180);
+}
+
 .giya-comment-html ol,
 .giya-rte-editor ol {
   list-style: decimal;

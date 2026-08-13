@@ -7,6 +7,7 @@ import {
   listPinThread,
   resolveConcern,
 } from "../../concern-client.ts";
+import { collectEnvSpecs } from "../../env-specs.ts";
 import { ICONS } from "../../icons.ts";
 import { avatarFallbackUrl } from "../../../shared/avatar.ts";
 import { escapeHtml, loadingMarkup, setButtonBusy } from "../dom.ts";
@@ -19,6 +20,23 @@ import type { WidgetElements } from "../types.ts";
 
 function shortId(name: string): string {
   return name.length > 10 ? name.slice(-8) : name;
+}
+
+function envSpecsMarkup(
+  specs: NonNullable<GiyaPinComment["pin"]["envSpecs"]> | undefined
+): string {
+  if (!specs?.length) return "";
+  const rows = specs
+    .map(
+      (s) =>
+        `<li><strong>${escapeHtml(s.label)}:</strong> ${escapeHtml(s.value)}</li>`
+    )
+    .join("");
+  return `
+    <details class="giya-env-specs">
+      <summary>System specs</summary>
+      <ul>${rows}</ul>
+    </details>`;
 }
 
 function threadItemHtml(item: GiyaPinComment, depth: number): string {
@@ -44,6 +62,7 @@ function threadItemHtml(item: GiyaPinComment, depth: number): string {
             <span class="font-mono text-[10px] text-neutral-400" title="${escapeHtml(item.commentName)}">#${escapeHtml(shortId(item.commentName))}</span>
           </div>
           <div class="giya-comment-html text-sm text-neutral-800">${body}</div>
+          ${envSpecsMarkup(item.pin.envSpecs)}
           <button
             type="button"
             data-reply-to="${escapeHtml(item.commentName)}"
@@ -260,6 +279,7 @@ export async function renderPinThreadPanel(
         text: html,
         threadId,
         parentId: replyParentId || root.commentName,
+        envSpecs: collectEnvSpecs(),
       });
 
       setButtonBusy(submitBtn, false, ICONS.send);

@@ -1994,6 +1994,16 @@
   function shortId(name) {
     return name.length > 10 ? name.slice(-8) : name;
   }
+  function envSpecsMarkup(specs) {
+    if (!specs?.length)
+      return "";
+    const rows = specs.map((s) => `<li><strong>${escapeHtml(s.label)}:</strong> ${escapeHtml(s.value)}</li>`).join("");
+    return `
+    <details class="giya-env-specs">
+      <summary>System specs</summary>
+      <ul>${rows}</ul>
+    </details>`;
+  }
   function threadItemHtml(item, depth) {
     const body = sanitizeCommentHtml(item.pin.text);
     const indent = Math.min(depth, 3) * 12;
@@ -2017,6 +2027,7 @@
             <span class="font-mono text-[10px] text-neutral-400" title="${escapeHtml(item.commentName)}">#${escapeHtml(shortId(item.commentName))}</span>
           </div>
           <div class="giya-comment-html text-sm text-neutral-800">${body}</div>
+          ${envSpecsMarkup(item.pin.envSpecs)}
           <button
             type="button"
             data-reply-to="${escapeHtml(item.commentName)}"
@@ -2197,7 +2208,8 @@
           tagName: root.pin.tagName,
           text: html,
           threadId,
-          parentId: replyParentId || root.commentName
+          parentId: replyParentId || root.commentName,
+          envSpecs: collectEnvSpecs()
         });
         setButtonBusy(submitBtn, false, ICONS.send);
         editor.setDisabled(false);
@@ -3599,5 +3611,5 @@
   }
 })();
 
-//# debugId=D798032DF47C9E5B64756E2164756E21
+//# debugId=4566846803411C9764756E2164756E21
 //# sourceMappingURL=widget.js.map
