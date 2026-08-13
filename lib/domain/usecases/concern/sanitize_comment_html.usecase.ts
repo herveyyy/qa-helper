@@ -1,7 +1,7 @@
 /** SW-safe HTML helpers (no DOMParser). Keep Frappe-ish comment tags. */
 
 const ALLOWED_TAG =
-  /^(?:a|b|blockquote|br|code|div|em|h1|h2|h3|i|img|li|ol|p|pre|s|span|strong|strike|u|ul)$/i;
+  /^(?:a|b|blockquote|br|code|details|div|em|h1|h2|h3|i|img|li|ol|p|pre|s|span|strong|strike|summary|u|ul)$/i;
 
 function decodeEntities(value: string): string {
   return value

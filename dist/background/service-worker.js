@@ -902,7 +902,7 @@
   }
 
   // lib/domain/usecases/concern/sanitize_comment_html.usecase.ts
-  var ALLOWED_TAG = /^(?:a|b|blockquote|br|code|div|em|h1|h2|h3|i|img|li|ol|p|pre|s|span|strong|strike|u|ul)$/i;
+  var ALLOWED_TAG = /^(?:a|b|blockquote|br|code|details|div|em|h1|h2|h3|i|img|li|ol|p|pre|s|span|strong|strike|summary|u|ul)$/i;
   function decodeEntities(value) {
     return value.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
   }
@@ -1938,5 +1938,5 @@
   });
 })();
 
-//# debugId=28F8CDFF792C375964756E2164756E21
+//# debugId=03BBEF549EA4F8F364756E2164756E21
 //# sourceMappingURL=service-worker.js.map

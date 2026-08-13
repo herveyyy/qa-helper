@@ -355,6 +355,27 @@
   margin: 0.35rem 0;
 }
 
+.giya-comment-html details,
+.giya-rte-editor details {
+  margin: 0.4rem 0;
+}
+
+.giya-comment-html details > summary,
+.giya-rte-editor details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.giya-comment-html details ol,
+.giya-rte-editor details ol {
+  margin-top: 0.4rem;
+}
+
+.giya-comment-html li > p:first-child,
+.giya-rte-editor li > p:first-child {
+  margin-top: 0;
+}
+
 [data-giya-theme="dark"] .giya-rte-toolbar {
   background: rgb(40 40 40);
   color: rgb(250 250 250);

@@ -20,44 +20,47 @@ function paragraphsFromPlain(text: string): string {
   return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
 }
 
-function stepBodyHtml(html: string): string {
-  return sanitizeCommentHtml(html);
+/** Drop leading empty <p>/<div> so "1." is not stuck alone above the real text. */
+function stripLeadingEmptyBlocks(html: string): string {
+  let out = html.trim();
+  const empty =
+    /^(?:<p(?:\s[^>]*)?>\s*(?:&nbsp;|\u00a0|<br\s*\/?>|\s)*<\/p>|<div(?:\s[^>]*)?>\s*(?:&nbsp;|\u00a0|<br\s*\/?>|\s)*<\/div>)\s*/i;
+  while (empty.test(out)) out = out.replace(empty, "");
+  return out.trim();
 }
 
-function stepToHtml(html: string, index: number): string {
+function stepBodyHtml(html: string): string {
+  return stripLeadingEmptyBlocks(sanitizeCommentHtml(html));
+}
+
+function stepToListItem(html: string): string {
   const body = stepBodyHtml(html);
   if (isBlankCommentHtml(body)) return "";
-  const n = index + 1;
-  // Explicit number survives Desk/Tailwind list-style resets.
-  if (/^<p(\s|>)/i.test(body)) {
-    return body.replace(/^<p([^>]*)>/i, `<p$1><strong>${n}.</strong> `);
-  }
-  return `<p><strong>${n}.</strong></p>${body}`;
+  // Real <li> keeps number + content together in Desk (unlike a lone <p><strong>1.</strong></p>).
+  return `<li>${body}</li>`;
 }
 
-/** Build Frappe-safe HTML for a steps-to-replicate block. */
-export function buildStepsToReplicateHtml(input: StepsToReplicateInput): string | null {
-  const numbered = input.steps
-    .map((html, index) => stepToHtml(html, index))
-    .filter(Boolean);
-  if (!numbered.length) return null;
+function sectionHtml(title: string, body: string): string {
+  if (!body) return "";
+  return `<p><strong>${title}</strong></p>${body}`;
+}
 
-  const parts: string[] = [
-    "<p><strong>Steps to replicate</strong></p>",
-    ...numbered,
-  ];
+/** Build Frappe-safe HTML for a collapsible steps-to-replicate block. */
+export function buildStepsToReplicateHtml(input: StepsToReplicateInput): string | null {
+  const items = input.steps.map(stepToListItem).filter(Boolean);
+  if (!items.length) return null;
 
   const expected = paragraphsFromPlain(input.expected);
-  if (expected) {
-    parts.push("<p><strong>Expected</strong></p>", expected);
-  }
-
   const actual = paragraphsFromPlain(input.actual);
-  if (actual) {
-    parts.push("<p><strong>Actual</strong></p>", actual);
-  }
 
-  return parts.join("");
+  return (
+    `<details open>` +
+    `<summary><strong>Steps to replicate</strong></summary>` +
+    `<ol>${items.join("")}</ol>` +
+    sectionHtml("Expected", expected) +
+    sectionHtml("Actual", actual) +
+    `</details>`
+  );
 }
 
 export type StepsBuilderApi = {
