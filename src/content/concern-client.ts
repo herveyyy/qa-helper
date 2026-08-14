@@ -20,6 +20,7 @@ export async function createConcern(input: {
   subject: string;
   type?: string;
   priority?: string;
+  status?: string;
   description?: string;
 }): Promise<{ ok: true; concern: Concern } | { ok: false; error: string }> {
   const response = await sendRuntimeMessage({
@@ -27,6 +28,7 @@ export async function createConcern(input: {
     subject: input.subject,
     concernType: input.type,
     priority: input.priority,
+    status: input.status,
     description: input.description,
   });
   if (response?.type === "CONCERN_CREATED") {
@@ -120,6 +122,81 @@ export async function resolveConcern(
         resolved: response.resolved,
       };
     }
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Faye was updated." };
+}
+
+export async function getConcernFields(
+  concernName: string
+): Promise<
+  | {
+      ok: true;
+      status: string;
+      currentAssignee: string;
+      devopsStatus: string;
+    }
+  | { ok: false; error: string }
+> {
+  const response = await sendRuntimeMessage({
+    type: "GET_CONCERN_FIELDS",
+    concernName,
+  });
+  if (response?.type === "CONCERN_FIELDS") {
+    if (response.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        currentAssignee: response.currentAssignee,
+        devopsStatus: response.devopsStatus,
+      };
+    }
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Faye was updated." };
+}
+
+export async function setConcernField(
+  concernName: string,
+  fieldname: "status" | "current_assignee",
+  value: string
+): Promise<{ ok: true; value: string } | { ok: false; error: string }> {
+  const response = await sendRuntimeMessage({
+    type: "SET_CONCERN_FIELD",
+    concernName,
+    fieldname,
+    value,
+  });
+  if (response?.type === "CONCERN_FIELD_SET") {
+    if (response.ok) return { ok: true, value: response.value };
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Faye was updated." };
+}
+
+export async function getSpbStatusOptions(): Promise<
+  { ok: true; options: string[] } | { ok: false; error: string }
+> {
+  const response = await sendRuntimeMessage({ type: "GET_SPB_STATUS_OPTIONS" });
+  if (response?.type === "SPB_STATUS_OPTIONS") {
+    if (response.ok) return { ok: true, options: response.options };
+    return { ok: false, error: response.error };
+  }
+  return { ok: false, error: "Reload this page — Faye was updated." };
+}
+
+export async function searchErpUsers(
+  query: string
+): Promise<
+  | { ok: true; users: Array<{ email: string; fullName: string }> }
+  | { ok: false; error: string }
+> {
+  const response = await sendRuntimeMessage({
+    type: "SEARCH_ERP_USERS",
+    query,
+  });
+  if (response?.type === "ERP_USERS") {
+    if (response.ok) return { ok: true, users: response.users };
     return { ok: false, error: response.error };
   }
   return { ok: false, error: "Reload this page — Faye was updated." };

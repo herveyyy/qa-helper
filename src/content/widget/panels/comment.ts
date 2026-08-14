@@ -3,6 +3,7 @@ import { addConcernPin } from "../../concern-client.ts";
 import type { PickedElement } from "../../element-picker.ts";
 import { collectEnvSpecs } from "../../env-specs.ts";
 import { ICONS } from "../../icons.ts";
+import { mountConcernFields } from "../concern-fields.ts";
 import { escapeHtml, loadingMarkup, setButtonBusy } from "../dom.ts";
 import {
   mountRichCommentEditor,
@@ -38,6 +39,7 @@ export function renderCommentPanel(
             Change concern
           </button>
         </div>
+        <div data-concern-fields class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2"></div>
         <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Pinned to</p>
           <p class="mt-0.5 break-all text-xs font-medium text-neutral-900">${escapeHtml(picked.label)}</p>
@@ -64,9 +66,20 @@ export function renderCommentPanel(
     "[data-comment-submit]"
   ) as HTMLButtonElement | null;
   const status = els.panelBody.querySelector("[data-comment-status]");
+  const fieldsHost = els.panelBody.querySelector(
+    "[data-concern-fields]"
+  ) as HTMLElement | null;
   const editorHost = els.panelBody.querySelector(
     "[data-comment-editor-host]"
   ) as HTMLElement | null;
+
+  if (fieldsHost) {
+    mountConcernFields(fieldsHost, {
+      concernName: concern.name,
+      initialStatus: concern.status || "Open",
+      initialAssignee: concern.currentAssignee || "",
+    });
+  }
 
   const editor = editorHost
     ? mountRichCommentEditor(editorHost, {

@@ -102,7 +102,7 @@ export async function listAssigneeConcerns(
   }
 }
 
-async function readErpError(res: Response): Promise<string> {
+export async function readErpError(res: Response): Promise<string> {
   try {
     const json = (await res.json()) as {
       message?: string | { message?: string };

@@ -10,6 +10,7 @@ import {
 import { collectEnvSpecs } from "../../env-specs.ts";
 import { ICONS } from "../../icons.ts";
 import { avatarFallbackUrl } from "../../../shared/avatar.ts";
+import { mountConcernFields } from "../concern-fields.ts";
 import { escapeHtml, loadingMarkup, setButtonBusy } from "../dom.ts";
 import { hydrateErpImages } from "../image-preview.ts";
 import {
@@ -105,6 +106,7 @@ export async function renderPinThreadPanel(
     <div class="space-y-3">
       <div class="space-y-2">
         <p class="text-sm font-semibold text-neutral-900">${escapeHtml(root.concernSubject || "Discussion")}</p>
+        <div data-concern-fields class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2"></div>
         <div class="flex flex-wrap items-center gap-2">
           <span data-devops-chip class="rounded-full bg-neutral-200/80 px-2 py-0.5 text-[10px] font-medium text-neutral-600">Loading status…</span>
           <button
@@ -144,6 +146,9 @@ export async function renderPinThreadPanel(
   ) as HTMLButtonElement;
   const resolveStatus = els.panelBody.querySelector(
     "[data-resolve-status]"
+  ) as HTMLElement;
+  const fieldsHost = els.panelBody.querySelector(
+    "[data-concern-fields]"
   ) as HTMLElement;
   const replyHint = els.panelBody.querySelector("[data-reply-hint]") as HTMLElement;
   const replyHintText = els.panelBody.querySelector(
@@ -198,6 +203,8 @@ export async function renderPinThreadPanel(
       resolveBtn.hidden = false;
     }
   };
+
+  mountConcernFields(fieldsHost, { concernName: root.concernName });
 
   const paintThread = () => {
     const depths = buildDepthMap(comments);

@@ -14,11 +14,15 @@ import {
   createAssigneeConcern,
   fetchErpFileDataUrl,
   getConcernDevopsStatus,
+  getConcernFields,
+  getSpbStatusOptions,
   invalidateConcernCaches,
   listAssigneeConcerns,
   listPagePinComments,
   listPinThreadComments,
   resolveConcernForStaging,
+  searchErpUsers,
+  setConcernField,
   uploadErpFile,
 } from "../../lib/domain/services/concern.service";
 import { getUserProfile, openUserPage } from "../../lib/domain/services/user.service";
@@ -126,6 +130,7 @@ async function handleMessage(
         subject: message.subject,
         type: message.concernType,
         priority: message.priority,
+        status: message.status,
         description: message.description,
       },
       ERP_BASE_URL
@@ -189,6 +194,50 @@ async function handleMessage(
           resolved: result.data.resolved,
         }
       : { type: "CONCERN_DEVOPS", ok: false, error: result.error };
+  }
+
+  if (message.type === "GET_CONCERN_FIELDS") {
+    const result = await getConcernFields(message.concernName, ERP_BASE_URL);
+    return result.ok
+      ? {
+          type: "CONCERN_FIELDS",
+          ok: true,
+          status: result.data.status,
+          currentAssignee: result.data.currentAssignee,
+          devopsStatus: result.data.devopsStatus,
+        }
+      : { type: "CONCERN_FIELDS", ok: false, error: result.error };
+  }
+
+  if (message.type === "SET_CONCERN_FIELD") {
+    const result = await setConcernField(
+      message.concernName,
+      message.fieldname,
+      message.value,
+      ERP_BASE_URL
+    );
+    return result.ok
+      ? {
+          type: "CONCERN_FIELD_SET",
+          ok: true,
+          fieldname: result.data.fieldname,
+          value: result.data.value,
+        }
+      : { type: "CONCERN_FIELD_SET", ok: false, error: result.error };
+  }
+
+  if (message.type === "GET_SPB_STATUS_OPTIONS") {
+    const result = await getSpbStatusOptions(ERP_BASE_URL);
+    return result.ok
+      ? { type: "SPB_STATUS_OPTIONS", ok: true, options: result.data }
+      : { type: "SPB_STATUS_OPTIONS", ok: false, error: result.error };
+  }
+
+  if (message.type === "SEARCH_ERP_USERS") {
+    const result = await searchErpUsers(message.query, ERP_BASE_URL);
+    return result.ok
+      ? { type: "ERP_USERS", ok: true, users: result.data }
+      : { type: "ERP_USERS", ok: false, error: result.error };
   }
 
   if (message.type === "UPLOAD_ERP_FILE") {

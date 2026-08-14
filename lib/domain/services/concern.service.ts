@@ -18,6 +18,12 @@ import {
 import { listAssigneeConcerns as listAssigneeConcernsUseCase } from "../usecases/concern/list_assignee_concerns.usecase";
 import { listPagePinComments as listPagePinCommentsUseCase } from "../usecases/concern/list_page_pin_comments.usecase";
 import { listPinThreadComments as listPinThreadCommentsUseCase } from "../usecases/concern/list_pin_thread.usecase";
+import {
+  getConcernFields as getConcernFieldsUseCase,
+  getSpbStatusOptions as getSpbStatusOptionsUseCase,
+  searchErpUsers as searchErpUsersUseCase,
+  setConcernField as setConcernFieldUseCase,
+} from "../usecases/concern/update_concern_fields.usecase";
 import { fetchErpFileDataUrl as fetchErpFileDataUrlUseCase } from "../usecases/erpnext/fetch_erp_file_data.usecase";
 import {
   uploadErpFile as uploadErpFileUseCase,
@@ -128,6 +134,37 @@ export async function resolveConcernForStaging(
   const result = await resolveConcernForStagingUseCase(concernName, baseUrl);
   if (result.ok) invalidateConcernCaches();
   return result;
+}
+
+export async function getConcernFields(
+  concernName: string,
+  baseUrl: string = ERP_BASE_URL
+) {
+  return getConcernFieldsUseCase(concernName, baseUrl);
+}
+
+export async function setConcernField(
+  concernName: string,
+  fieldname: "status" | "current_assignee",
+  value: string,
+  baseUrl: string = ERP_BASE_URL
+) {
+  const result = await setConcernFieldUseCase(
+    concernName,
+    fieldname,
+    value,
+    baseUrl
+  );
+  if (result.ok) invalidateConcernCaches();
+  return result;
+}
+
+export async function getSpbStatusOptions(baseUrl: string = ERP_BASE_URL) {
+  return getSpbStatusOptionsUseCase(baseUrl);
+}
+
+export async function searchErpUsers(query: string, baseUrl: string = ERP_BASE_URL) {
+  return searchErpUsersUseCase(query, baseUrl);
 }
 
 export async function uploadErpFile(

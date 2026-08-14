@@ -724,6 +724,7 @@
     const email = session.data.email;
     const type = (input.type || "Bugs/Issues").trim() || "Bugs/Issues";
     const priority = (input.priority || "Medium").trim() || "Medium";
+    const status = (input.status || "Open").trim() || "Open";
     const description = input.description?.trim() || "<p>Created from Faye.</p>";
     const expStartDate = new Date().toISOString().slice(0, 10);
     try {
@@ -735,7 +736,7 @@
             doctype: "Sprint Backlogs",
             subject,
             type,
-            status: "Open",
+            status,
             priority,
             module: "RND",
             sprint_assign: sprint.data,
@@ -769,7 +770,7 @@
         data: {
           name: String(doc.name),
           subject: String(doc.subject || subject),
-          status: String(doc.status || "Open"),
+          status: String(doc.status || status),
           type: String(doc.type || type),
           priority: String(doc.priority || priority),
           sprintAssign: doc.sprint_assign || sprint.data,
@@ -1445,6 +1446,168 @@
     }
   }
 
+  // lib/domain/usecases/concern/update_concern_fields.usecase.ts
+  var FALLBACK_SPB_STATUSES = [
+    "Open",
+    "Working",
+    "Pending Review",
+    "Completed",
+    "Cancelled",
+    "Closed"
+  ];
+  async function getConcernFields(concernName, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const name = concernName.trim();
+    if (!name)
+      return { ok: false, error: "Missing concern." };
+    try {
+      const params = new URLSearchParams({
+        doctype: "Sprint Backlogs",
+        fields: JSON.stringify([
+          "name",
+          "status",
+          "current_assignee",
+          "devops_status"
+        ]),
+        filters: JSON.stringify([["name", "=", name]]),
+        limit_page_length: "1"
+      });
+      const res = await erpFetch(`${site}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 12000);
+      if (!res.ok) {
+        return { ok: false, error: `Could not read concern (${res.status}).` };
+      }
+      const json = await res.json();
+      if (json.exc)
+        return { ok: false, error: "Could not read concern fields." };
+      const row = Array.isArray(json.message) ? json.message[0] : undefined;
+      return {
+        ok: true,
+        data: {
+          status: String(row?.status || "").trim() || "Open",
+          currentAssignee: String(row?.current_assignee || "").trim(),
+          devopsStatus: String(row?.devops_status || "").trim()
+        }
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to read concern.")
+      };
+    }
+  }
+  async function setConcernField(concernName, fieldname, value, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const name = concernName.trim();
+    const next = value.trim();
+    if (!name)
+      return { ok: false, error: "Missing concern." };
+    if (fieldname === "current_assignee" && !next) {
+      return { ok: false, error: "Pick an assignee." };
+    }
+    if (fieldname === "status" && !next) {
+      return { ok: false, error: "Pick a status." };
+    }
+    try {
+      const res = await erpFetch(`${site}/api/method/frappe.client.set_value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctype: "Sprint Backlogs",
+          name,
+          fieldname,
+          value: next
+        })
+      });
+      if (!res.ok) {
+        return { ok: false, error: `Could not update ${fieldname} (${res.status}).` };
+      }
+      const json = await res.json();
+      if (json.exc) {
+        return { ok: false, error: `Could not update ${fieldname}.` };
+      }
+      return { ok: true, data: { fieldname, value: next } };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, `Failed to update ${fieldname}.`)
+      };
+    }
+  }
+  async function getSpbStatusOptions(baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    try {
+      const res = await erpFetch(`${site}/api/method/frappe.get_meta`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctype: "Sprint Backlogs" })
+      });
+      if (!res.ok) {
+        return { ok: true, data: [...FALLBACK_SPB_STATUSES] };
+      }
+      const json = await res.json();
+      const field = json.message?.fields?.find((f) => f.fieldname === "status");
+      const fromMeta = String(field?.options || "").split(`
+`).map((s) => s.trim()).filter(Boolean);
+      const merged = Array.from(new Set([...FALLBACK_SPB_STATUSES, ...fromMeta]));
+      return { ok: true, data: fromMeta.length ? fromMeta : merged };
+    } catch {
+      return { ok: true, data: [...FALLBACK_SPB_STATUSES] };
+    }
+  }
+  async function searchErpUsers(query, baseUrl = ERP_BASE_URL) {
+    const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
+    const session = await getExtensionSession(site);
+    if (!session.ok)
+      return session;
+    const txt = query.trim();
+    try {
+      const filters = [
+        ["enabled", "=", 1]
+      ];
+      if (txt)
+        filters.push(["full_name", "like", `%${txt}%`]);
+      const params = new URLSearchParams({
+        doctype: "User",
+        fields: JSON.stringify(["name", "full_name"]),
+        filters: JSON.stringify(filters),
+        order_by: "full_name asc",
+        limit_page_length: "12"
+      });
+      const res = await erpFetch(`${site}/api/method/frappe.client.get_list?${params}`, { method: "GET" }, 12000);
+      if (!res.ok) {
+        const detail = await readErpError(res);
+        return {
+          ok: false,
+          error: detail || `User search failed (${res.status}).`
+        };
+      }
+      const json = await res.json();
+      if (json.exc)
+        return { ok: false, error: "User search failed." };
+      const hits = (Array.isArray(json.message) ? json.message : []).map((row) => {
+        const email = String(row.name || "").trim();
+        if (!email)
+          return null;
+        return { email, fullName: String(row.full_name || "").trim() || email };
+      }).filter((x) => Boolean(x));
+      return { ok: true, data: hits };
+    } catch (error) {
+      return {
+        ok: false,
+        error: erpErrorMessage(error, "Failed to search users.")
+      };
+    }
+  }
+
   // lib/domain/usecases/erpnext/fetch_erp_file_data.usecase.ts
   async function fetchErpFileDataUrl(fileUrl, baseUrl = ERP_BASE_URL) {
     const site = normalizeErpBaseUrl(baseUrl) || ERP_BASE_URL;
@@ -1621,6 +1784,21 @@
     if (result.ok)
       invalidateConcernCaches();
     return result;
+  }
+  async function getConcernFields2(concernName, baseUrl = ERP_BASE_URL) {
+    return getConcernFields(concernName, baseUrl);
+  }
+  async function setConcernField2(concernName, fieldname, value, baseUrl = ERP_BASE_URL) {
+    const result = await setConcernField(concernName, fieldname, value, baseUrl);
+    if (result.ok)
+      invalidateConcernCaches();
+    return result;
+  }
+  async function getSpbStatusOptions2(baseUrl = ERP_BASE_URL) {
+    return getSpbStatusOptions(baseUrl);
+  }
+  async function searchErpUsers2(query, baseUrl = ERP_BASE_URL) {
+    return searchErpUsers(query, baseUrl);
   }
   async function uploadErpFile2(input, baseUrl = ERP_BASE_URL) {
     return uploadErpFile(input, baseUrl);
@@ -1800,6 +1978,7 @@
         subject: message.subject,
         type: message.concernType,
         priority: message.priority,
+        status: message.status,
         description: message.description
       }, ERP_BASE_URL);
       return result.ok ? { type: "CONCERN_CREATED", ok: true, concern: result.data } : { type: "CONCERN_CREATED", ok: false, error: result.error };
@@ -1833,6 +2012,33 @@
         devopsStatus: result.data.devopsStatus,
         resolved: result.data.resolved
       } : { type: "CONCERN_DEVOPS", ok: false, error: result.error };
+    }
+    if (message.type === "GET_CONCERN_FIELDS") {
+      const result = await getConcernFields2(message.concernName, ERP_BASE_URL);
+      return result.ok ? {
+        type: "CONCERN_FIELDS",
+        ok: true,
+        status: result.data.status,
+        currentAssignee: result.data.currentAssignee,
+        devopsStatus: result.data.devopsStatus
+      } : { type: "CONCERN_FIELDS", ok: false, error: result.error };
+    }
+    if (message.type === "SET_CONCERN_FIELD") {
+      const result = await setConcernField2(message.concernName, message.fieldname, message.value, ERP_BASE_URL);
+      return result.ok ? {
+        type: "CONCERN_FIELD_SET",
+        ok: true,
+        fieldname: result.data.fieldname,
+        value: result.data.value
+      } : { type: "CONCERN_FIELD_SET", ok: false, error: result.error };
+    }
+    if (message.type === "GET_SPB_STATUS_OPTIONS") {
+      const result = await getSpbStatusOptions2(ERP_BASE_URL);
+      return result.ok ? { type: "SPB_STATUS_OPTIONS", ok: true, options: result.data } : { type: "SPB_STATUS_OPTIONS", ok: false, error: result.error };
+    }
+    if (message.type === "SEARCH_ERP_USERS") {
+      const result = await searchErpUsers2(message.query, ERP_BASE_URL);
+      return result.ok ? { type: "ERP_USERS", ok: true, users: result.data } : { type: "ERP_USERS", ok: false, error: result.error };
     }
     if (message.type === "UPLOAD_ERP_FILE") {
       const result = await uploadErpFile2({
@@ -1938,5 +2144,5 @@
   });
 })();
 
-//# debugId=03BBEF549EA4F8F364756E2164756E21
+//# debugId=1B9E9DB5124E107264756E2164756E21
 //# sourceMappingURL=service-worker.js.map

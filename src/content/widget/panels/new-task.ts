@@ -1,5 +1,6 @@
 import type { Concern } from "../../../../lib/entities/concern.type";
-import { createConcern } from "../../concern-client.ts";
+import { FALLBACK_SPB_STATUSES } from "../../../../lib/domain/usecases/concern/update_concern_fields.usecase";
+import { createConcern, getSpbStatusOptions } from "../../concern-client.ts";
 import { ICONS } from "../../icons.ts";
 import { escapeHtml, loadingMarkup, setButtonBusy } from "../dom.ts";
 import type { WidgetElements } from "../types.ts";
@@ -18,7 +19,7 @@ export function renderNewTaskPanel(
   els.panelBody.innerHTML = `
       <div class="space-y-3">
         <p class="text-xs leading-relaxed text-neutral-600">
-          Creates an open Sprint Backlog on the latest R&amp;D sprint, assigned to you.
+          Creates a Sprint Backlog on the latest R&amp;D sprint, assigned to you.
         </p>
         <input
           type="text"
@@ -32,6 +33,15 @@ export function renderNewTaskPanel(
         >
           <option value="Bugs/Issues" selected>Bugs/Issues</option>
           <option value="Feature Request">Feature Request</option>
+        </select>
+        <select
+          data-create-spb-status
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
+        >
+          ${FALLBACK_SPB_STATUSES.map(
+            (value) =>
+              `<option value="${escapeHtml(value)}" ${value === "Open" ? "selected" : ""}>${escapeHtml(value)}</option>`
+          ).join("")}
         </select>
         <button
           type="button"
@@ -54,12 +64,26 @@ export function renderNewTaskPanel(
   const typeSelect = els.panelBody.querySelector(
     "[data-create-type]"
   ) as HTMLSelectElement | null;
+  const statusSelect = els.panelBody.querySelector(
+    "[data-create-spb-status]"
+  ) as HTMLSelectElement | null;
   const createBtn = els.panelBody.querySelector(
     "[data-create-spb]"
   ) as HTMLButtonElement | null;
   const createStatus = els.panelBody.querySelector(
     "[data-create-status]"
   ) as HTMLParagraphElement | null;
+
+  void getSpbStatusOptions().then((result) => {
+    if (!result.ok || !statusSelect) return;
+    const current = statusSelect.value || "Open";
+    statusSelect.innerHTML = result.options
+      .map(
+        (value) =>
+          `<option value="${escapeHtml(value)}" ${value === current ? "selected" : ""}>${escapeHtml(value)}</option>`
+      )
+      .join("");
+  });
 
   const idleHtml = `${ICONS.plus} Create`;
 
@@ -75,6 +99,7 @@ export function renderNewTaskPanel(
       const created = await createConcern({
         subject,
         type: typeSelect?.value || "Bugs/Issues",
+        status: statusSelect?.value || "Open",
         description: `<p>Created from Faye on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`,
       });
       if (!created.ok) {

@@ -27,6 +27,7 @@ export type ExtensionRequest =
       subject: string;
       concernType?: string;
       priority?: string;
+      status?: string;
       description?: string;
     }
   | { type: "LIST_PAGE_PINS"; href: string }
@@ -34,6 +35,15 @@ export type ExtensionRequest =
   | { type: "LIST_PIN_THREAD"; concernName: string; threadId: string }
   | { type: "GET_CONCERN_DEVOPS"; concernName: string }
   | { type: "RESOLVE_CONCERN"; concernName: string }
+  | { type: "GET_CONCERN_FIELDS"; concernName: string }
+  | {
+      type: "SET_CONCERN_FIELD";
+      concernName: string;
+      fieldname: "status" | "current_assignee";
+      value: string;
+    }
+  | { type: "GET_SPB_STATUS_OPTIONS" }
+  | { type: "SEARCH_ERP_USERS"; query: string }
   | {
       type: "UPLOAD_ERP_FILE";
       filename: string;
@@ -89,6 +99,29 @@ export type ExtensionResponse =
       resolved: boolean;
     }
   | { type: "CONCERN_DEVOPS"; ok: false; error: string }
+  | {
+      type: "CONCERN_FIELDS";
+      ok: true;
+      status: string;
+      currentAssignee: string;
+      devopsStatus: string;
+    }
+  | { type: "CONCERN_FIELDS"; ok: false; error: string }
+  | {
+      type: "CONCERN_FIELD_SET";
+      ok: true;
+      fieldname: string;
+      value: string;
+    }
+  | { type: "CONCERN_FIELD_SET"; ok: false; error: string }
+  | { type: "SPB_STATUS_OPTIONS"; ok: true; options: string[] }
+  | { type: "SPB_STATUS_OPTIONS"; ok: false; error: string }
+  | {
+      type: "ERP_USERS";
+      ok: true;
+      users: Array<{ email: string; fullName: string }>;
+    }
+  | { type: "ERP_USERS"; ok: false; error: string }
   | { type: "ERP_FILE"; ok: true; fileUrl: string; fileName: string }
   | { type: "ERP_FILE"; ok: false; error: string }
   | { type: "ERP_FILE_DATA"; ok: true; dataUrl: string; mimeType: string }

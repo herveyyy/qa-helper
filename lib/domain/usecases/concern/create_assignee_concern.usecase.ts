@@ -8,6 +8,7 @@ export type CreateConcernInput = {
   subject: string;
   type?: string;
   priority?: string;
+  status?: string;
   /** Optional HTML/text description (page URL etc.). */
   description?: string;
 };
@@ -43,6 +44,7 @@ export async function createAssigneeConcern(
   const email = session.data.email;
   const type = (input.type || "Bugs/Issues").trim() || "Bugs/Issues";
   const priority = (input.priority || "Medium").trim() || "Medium";
+  const status = (input.status || "Open").trim() || "Open";
   const description =
     input.description?.trim() ||
     "<p>Created from Faye.</p>";
@@ -59,7 +61,7 @@ export async function createAssigneeConcern(
             doctype: "Sprint Backlogs",
             subject,
             type,
-            status: "Open",
+            status,
             priority,
             module: "RND",
             sprint_assign: sprint.data,
@@ -101,7 +103,7 @@ export async function createAssigneeConcern(
       data: {
         name: String(doc.name),
         subject: String(doc.subject || subject),
-        status: String(doc.status || "Open"),
+        status: String(doc.status || status),
         type: String(doc.type || type),
         priority: String(doc.priority || priority),
         sprintAssign: doc.sprint_assign || sprint.data,

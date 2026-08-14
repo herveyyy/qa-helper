@@ -468,6 +468,7 @@
       subject: input.subject,
       concernType: input.type,
       priority: input.priority,
+      status: input.status,
       description: input.description
     });
     if (response?.type === "CONCERN_CREATED") {
@@ -542,6 +543,59 @@
           resolved: response.resolved
         };
       }
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Faye was updated." };
+  }
+  async function getConcernFields(concernName) {
+    const response = await sendRuntimeMessage({
+      type: "GET_CONCERN_FIELDS",
+      concernName
+    });
+    if (response?.type === "CONCERN_FIELDS") {
+      if (response.ok) {
+        return {
+          ok: true,
+          status: response.status,
+          currentAssignee: response.currentAssignee,
+          devopsStatus: response.devopsStatus
+        };
+      }
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Faye was updated." };
+  }
+  async function setConcernField(concernName, fieldname, value) {
+    const response = await sendRuntimeMessage({
+      type: "SET_CONCERN_FIELD",
+      concernName,
+      fieldname,
+      value
+    });
+    if (response?.type === "CONCERN_FIELD_SET") {
+      if (response.ok)
+        return { ok: true, value: response.value };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Faye was updated." };
+  }
+  async function getSpbStatusOptions() {
+    const response = await sendRuntimeMessage({ type: "GET_SPB_STATUS_OPTIONS" });
+    if (response?.type === "SPB_STATUS_OPTIONS") {
+      if (response.ok)
+        return { ok: true, options: response.options };
+      return { ok: false, error: response.error };
+    }
+    return { ok: false, error: "Reload this page — Faye was updated." };
+  }
+  async function searchErpUsers(query) {
+    const response = await sendRuntimeMessage({
+      type: "SEARCH_ERP_USERS",
+      query
+    });
+    if (response?.type === "ERP_USERS") {
+      if (response.ok)
+        return { ok: true, users: response.users };
       return { ok: false, error: response.error };
     }
     return { ok: false, error: "Reload this page — Faye was updated." };
@@ -645,6 +699,143 @@
         value: chrome.runtime.getManifest().version
       }
     ];
+  }
+
+  // lib/entities/erpnext.type.ts
+  var ERP_HOST = "erp.livro.systems";
+  var ERP_BASE_URL = `https://${ERP_HOST}`;
+
+  // lib/domain/usecases/concern/list_assignee_concerns.usecase.ts
+  var DONE_STATUSES = new Set(["completed", "cancelled", "closed"]);
+
+  // lib/domain/usecases/concern/update_concern_fields.usecase.ts
+  var FALLBACK_SPB_STATUSES = [
+    "Open",
+    "Working",
+    "Pending Review",
+    "Completed",
+    "Cancelled",
+    "Closed"
+  ];
+
+  // src/content/widget/concern-fields.ts
+  function statusOptionsHtml(options, selected) {
+    const values = Array.from(new Set(options.filter(Boolean)));
+    if (selected && !values.includes(selected))
+      values.unshift(selected);
+    return values.map((value) => `<option value="${escapeHtml(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(value)}</option>`).join("");
+  }
+  function mountConcernFields(host, opts) {
+    host.innerHTML = `
+    <div class="giya-fields">
+      <div class="giya-fields-row">
+        <label class="giya-field">
+          <span class="giya-field-label">Status</span>
+          <select data-concern-status class="giya-field-control">
+            ${statusOptionsHtml(FALLBACK_SPB_STATUSES, opts.initialStatus || "Open")}
+          </select>
+        </label>
+        <div class="giya-field giya-assignee">
+          <span class="giya-field-label">Current assignee</span>
+          <input
+            type="search"
+            data-assignee-input
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Search user…"
+            class="giya-field-control"
+            value="${escapeHtml(opts.initialAssignee || "")}"
+          />
+          <div data-assignee-list class="giya-assignee-list" hidden></div>
+        </div>
+      </div>
+      <p data-fields-status class="giya-field-status"></p>
+    </div>
+  `;
+    const statusSelect = host.querySelector("[data-concern-status]");
+    const input = host.querySelector("[data-assignee-input]");
+    const list = host.querySelector("[data-assignee-list]");
+    const statusEl = host.querySelector("[data-fields-status]");
+    const setMsg = (message) => {
+      statusEl.textContent = message;
+    };
+    const hideList = () => {
+      list.hidden = true;
+      list.innerHTML = "";
+    };
+    let seq = 0;
+    let timer = null;
+    const runSearch = (query) => {
+      const id = ++seq;
+      (async () => {
+        const result = await searchErpUsers(query);
+        if (id !== seq)
+          return;
+        if (!result.ok) {
+          setMsg(result.error);
+          hideList();
+          return;
+        }
+        if (!result.users.length) {
+          list.innerHTML = `<p class="giya-assignee-empty">No users found</p>`;
+          list.hidden = false;
+          return;
+        }
+        list.innerHTML = result.users.map((u) => `
+        <button type="button" class="giya-assignee-item" data-email="${escapeHtml(u.email)}" data-name="${escapeHtml(u.fullName)}">
+          <span class="giya-assignee-name">${escapeHtml(u.fullName)}</span>
+          <span class="giya-assignee-email">${escapeHtml(u.email)}</span>
+        </button>`).join("");
+        list.hidden = false;
+      })();
+    };
+    input.addEventListener("focus", () => runSearch(input.value.trim()));
+    input.addEventListener("input", () => {
+      if (timer)
+        clearTimeout(timer);
+      timer = setTimeout(() => runSearch(input.value.trim()), 220);
+    });
+    input.addEventListener("blur", () => setTimeout(hideList, 150));
+    list.addEventListener("mousedown", (event) => event.preventDefault());
+    list.addEventListener("click", (event) => {
+      const btn = event.target?.closest("[data-email]");
+      const email = btn?.dataset.email || "";
+      if (!email)
+        return;
+      const fullName = btn?.dataset.name || email;
+      input.value = email;
+      hideList();
+      (async () => {
+        setMsg("Updating assignee…");
+        const result = await setConcernField(opts.concernName, "current_assignee", email);
+        setMsg(result.ok ? `Assignee → ${fullName}` : result.error);
+      })();
+    });
+    statusSelect.addEventListener("change", () => {
+      const value = statusSelect.value.trim();
+      if (!value)
+        return;
+      (async () => {
+        setMsg("Updating status…");
+        const result = await setConcernField(opts.concernName, "status", value);
+        setMsg(result.ok ? `Status → ${value}` : result.error);
+      })();
+    });
+    (async () => {
+      const [fields, options] = await Promise.all([
+        getConcernFields(opts.concernName),
+        getSpbStatusOptions()
+      ]);
+      const current = fields.ok ? fields.status : opts.initialStatus || "Open";
+      if (options.ok) {
+        statusSelect.innerHTML = statusOptionsHtml(options.options, current);
+      }
+      statusSelect.value = current;
+      if (fields.ok)
+        input.value = fields.currentAssignee || "";
+      else
+        setMsg(fields.error);
+    })();
   }
 
   // lib/domain/usecases/concern/sanitize_comment_html.usecase.ts
@@ -1500,6 +1691,7 @@
             Change concern
           </button>
         </div>
+        <div data-concern-fields class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2"></div>
         <div class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Pinned to</p>
           <p class="mt-0.5 break-all text-xs font-medium text-neutral-900">${escapeHtml(picked.label)}</p>
@@ -1523,7 +1715,15 @@
     `;
     const submitBtn = els.panelBody.querySelector("[data-comment-submit]");
     const status = els.panelBody.querySelector("[data-comment-status]");
+    const fieldsHost = els.panelBody.querySelector("[data-concern-fields]");
     const editorHost = els.panelBody.querySelector("[data-comment-editor-host]");
+    if (fieldsHost) {
+      mountConcernFields(fieldsHost, {
+        concernName: concern.name,
+        initialStatus: concern.status || "Open",
+        initialAssignee: concern.currentAssignee || ""
+      });
+    }
     const editor = editorHost ? mountRichCommentEditor(editorHost, {
       placeholder: "Write a comment…",
       concernName: concern.name,
@@ -1862,7 +2062,7 @@
     els.panelBody.innerHTML = `
       <div class="space-y-3">
         <p class="text-xs leading-relaxed text-neutral-600">
-          Creates an open Sprint Backlog on the latest R&amp;D sprint, assigned to you.
+          Creates a Sprint Backlog on the latest R&amp;D sprint, assigned to you.
         </p>
         <input
           type="text"
@@ -1876,6 +2076,12 @@
         >
           <option value="Bugs/Issues" selected>Bugs/Issues</option>
           <option value="Feature Request">Feature Request</option>
+        </select>
+        <select
+          data-create-spb-status
+          class="w-full rounded-lg border border-black/10 bg-white/70 px-2 py-1.5 text-xs text-neutral-800 outline-none ring-neutral-900 focus:ring-2"
+        >
+          ${FALLBACK_SPB_STATUSES.map((value) => `<option value="${escapeHtml(value)}" ${value === "Open" ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}
         </select>
         <button
           type="button"
@@ -1892,8 +2098,15 @@
     host.focusPanelField("[data-create-subject]");
     const subjectInput = els.panelBody.querySelector("[data-create-subject]");
     const typeSelect = els.panelBody.querySelector("[data-create-type]");
+    const statusSelect = els.panelBody.querySelector("[data-create-spb-status]");
     const createBtn = els.panelBody.querySelector("[data-create-spb]");
     const createStatus = els.panelBody.querySelector("[data-create-status]");
+    getSpbStatusOptions().then((result) => {
+      if (!result.ok || !statusSelect)
+        return;
+      const current = statusSelect.value || "Open";
+      statusSelect.innerHTML = result.options.map((value) => `<option value="${escapeHtml(value)}" ${value === current ? "selected" : ""}>${escapeHtml(value)}</option>`).join("");
+    });
     const idleHtml = `${ICONS.plus} Create`;
     const runCreate = () => {
       (async () => {
@@ -1909,6 +2122,7 @@
         const created = await createConcern({
           subject,
           type: typeSelect?.value || "Bugs/Issues",
+          status: statusSelect?.value || "Open",
           description: `<p>Created from Faye on <a href="${escapeHtml(location.href)}">${escapeHtml(location.href)}</a></p>`
         });
         if (!created.ok) {
@@ -1978,10 +2192,6 @@
   function applyGiyaTheme(root, theme) {
     root.dataset.giyaTheme = theme;
   }
-
-  // lib/entities/erpnext.type.ts
-  var ERP_HOST = "erp.livro.systems";
-  var ERP_BASE_URL = `https://${ERP_HOST}`;
 
   // lib/domain/usecases/concern/list_pin_thread.usecase.ts
   function pinThreadId(commentName, pin) {
@@ -2064,6 +2274,7 @@
     <div class="space-y-3">
       <div class="space-y-2">
         <p class="text-sm font-semibold text-neutral-900">${escapeHtml(root.concernSubject || "Discussion")}</p>
+        <div data-concern-fields class="rounded-xl border border-black/8 bg-white/50 px-2.5 py-2"></div>
         <div class="flex flex-wrap items-center gap-2">
           <span data-devops-chip class="rounded-full bg-neutral-200/80 px-2 py-0.5 text-[10px] font-medium text-neutral-600">Loading status…</span>
           <button
@@ -2099,6 +2310,7 @@
     const chip = els.panelBody.querySelector("[data-devops-chip]");
     const resolveBtn = els.panelBody.querySelector("[data-resolve]");
     const resolveStatus = els.panelBody.querySelector("[data-resolve-status]");
+    const fieldsHost = els.panelBody.querySelector("[data-concern-fields]");
     const replyHint = els.panelBody.querySelector("[data-reply-hint]");
     const replyHintText = els.panelBody.querySelector("[data-reply-hint-text]");
     const replyStatus = els.panelBody.querySelector("[data-reply-status]");
@@ -2136,6 +2348,7 @@
         resolveBtn.hidden = false;
       }
     };
+    mountConcernFields(fieldsHost, { concernName: root.concernName });
     const paintThread = () => {
       const depths = buildDepthMap(comments);
       if (comments.length === 0) {
@@ -3609,5 +3822,5 @@
   }
 })();
 
-//# debugId=6E2A8E039B8CFDCE64756E2164756E21
+//# debugId=DEF1F5D59558A3B964756E2164756E21
 //# sourceMappingURL=widget.js.map
