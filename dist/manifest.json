@@ -1,7 +1,7 @@
 {
   "name": "Faye",
   "description": "Floating Faye assistant with a right sidebar on any page.",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "manifest_version": 3,
   "icons": {
     "16": "assets/faye-icon-16.png",
